@@ -119,7 +119,7 @@ exports.renamePackages = function (cwd, names) {
  * @param {string}  cwd path to working directory
  * @param {string?} opt workspace folder to reset
  */
-exports.resetTestingEnvironment = function (cwd, opt) {
+exports.resetEnvironment = function (cwd, opt) {
 
   let pathToReset;
 

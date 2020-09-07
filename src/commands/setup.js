@@ -2,11 +2,11 @@ const { getConfig } = require('../config/config');
 const { LogTask }   = require('../debug/task-logger');
 //
 const {
-  cloneTemplates: cloneTemplateRepositories,
+  cloneTemplates,
   cloneInstances,
   installWorkspace,
   renamePackages,
-  resetTestingEnvironment,
+  resetEnvironment,
 } = require('../handlers/setup');
 
 
@@ -44,13 +44,13 @@ exports.handler = (opts) => {
 
   // Clone template repositories
   if (template || defaultRun) {
-    resetTestingEnvironment(cwd, 'templates');
-    cloneTemplateRepositories(templates, cwd, verbose);
+    resetEnvironment(cwd, 'templates');
+    cloneTemplates(templates, cwd, verbose);
   }
 
   // Setup instance repositories
   if (instance || defaultRun) {
-    resetTestingEnvironment(cwd, 'instances');
+    resetEnvironment(cwd, 'instances');
     Object
       .entries(instances)
       .forEach(([key, { branch, names }]) => {
