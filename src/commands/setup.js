@@ -10,6 +10,19 @@ const {
 } = require('../handlers/setup');
 
 
+/* TYPES */
+
+/**
+ * @typedef  {Object} SetupConfig Setup command options.
+ * @property {boolean} install Install modules (requires instances)
+ * @property {boolean} instance Clone instances (requires templates)
+ * @property {boolean} template Clone templates
+ * @property {boolean} verbose Global _verbose_ option
+**/
+
+
+/* COMMAND */
+
 exports.command = 'setup';
 
 exports.describe = 'Setup a testing environment workspace.';
@@ -32,6 +45,10 @@ exports.builder = {
   },
 };
 
+/**
+ * Command execution handler.
+ * @param {SetupConfig} opts setup command options
+ */
 exports.handler = (opts) => {
 
   const { cwd, instances, templates } = getConfig();
