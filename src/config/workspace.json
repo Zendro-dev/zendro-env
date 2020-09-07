@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "name": "zendro-test-env",
+  "version": "0.0.1",
+  "description": "Zendro integration-tests environment",
+  "workspaces": [
+    "templates/*-codegen",
+    "instances/*"
+  ]
+}
