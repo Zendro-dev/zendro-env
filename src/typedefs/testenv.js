@@ -10,14 +10,8 @@
 
 /**
  * @typedef  {Object} TestInstances Testing environment instances
- * @property {InstanceDef} gql graphql-server instance definitions
- * @property {InstanceDef} spa single-page-app instance definitions
-**/
-
-/**
- * @typedef  {Object} InstanceDef Testing environment instance
- * @property {string}   branch name of the branch to clone
- * @property {string[]} names  name of each instance
+ * @property {string[]} gql graphql-server instance definitions
+ * @property {string[]} spa single-page-app instance definitions
 **/
 
 //

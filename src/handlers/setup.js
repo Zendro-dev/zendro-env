@@ -39,7 +39,7 @@ exports.cloneTemplates = function (paths, cwd, verbose) {
  * @param {string} key name of template repository
  * @param {string} branch branch to checkout
  */
-exports.cloneInstances = function (cwd, names, key, branch, verbose) {
+exports.cloneInstances = function (cwd, names, key, verbose) {
 
   names.forEach(name => {
 
@@ -48,7 +48,7 @@ exports.cloneInstances = function (cwd, names, key, branch, verbose) {
     const src = `./templates/${key}/.git`;
     const dest = `instances/${name}`;
 
-    execSync(`git clone --branch ${branch} ${src} ${dest}`, {
+    execSync(`git clone ${src} ${dest}`, {
       cwd,
       stdio: verbose ? 'inherit' : 'ignore',
     });

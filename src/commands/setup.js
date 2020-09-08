@@ -61,10 +61,10 @@ exports.handler = (opts) => {
     resetEnvironment(cwd, 'instances');
     Object
       .entries(instances)
-      .forEach(([key, { branch, names }]) => {
+      .forEach(([key, names]) => {
 
         // Clone from templates
-        cloneInstances(cwd, names, key, branch, verbose);
+        cloneInstances(cwd, names, key, verbose);
 
         // Edit package.json#name (yarn workspaces requires unique names)
         renamePackages(cwd, names);
