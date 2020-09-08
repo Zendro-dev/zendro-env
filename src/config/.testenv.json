@@ -1,0 +1,56 @@
+{
+  "cwd": "./docker/integration_test_run",
+  "instances": {
+    "gql": [
+      "gql-instance1",
+      "gql-instance2"
+    ],
+    "spa": [
+      "spa-instance1",
+      "spa-instance2"
+    ]
+  },
+  "models": [
+    {
+      "path": "../../test/integration_test_models_instance1",
+      "gql": [ "gql-instance1" ],
+      "spa": [ "spa-instance1" ]
+    },
+    {
+      "path": "../../test/integration_test_models_instance2",
+      "gql": [ "gql-instance2" ],
+      "spa": [ "spa-instance2" ]
+    }
+  ],
+  "patches": [
+    {
+      "name": "gql-instance1",
+      "src": "../../test/patches/with_validations.js.patch",
+      "dest": "validations/with_validations.js"
+    },
+    {
+      "name": "spa-instance1",
+      "src": "../../test/patches/acl_rules.js.patch",
+      "dest": "src/acl_rules.js"
+    }
+  ],
+  "templates": {
+    "gql": {
+      "branch": "master",
+      "url": "git@github.com:Zendro-dev/graphql-server.git"
+    },
+    "gql-codegen": {
+      "branch": "master",
+      "url": "git@github.com:Zendro-dev/graphql-server-model-codegen.git"
+    },
+    "spa": {
+      "branch": "master",
+      "url": "git@github.com:Zendro-dev/single-page-app.git"
+    },
+    "spa-codegen": {
+      "source": true,
+      "branch": "master",
+      "url": "../../.git"
+    }
+  }
+}
