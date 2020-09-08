@@ -8,6 +8,31 @@ require('../typedefs');
 
 
 /**
+ *
+ * @param {string}     cwd     path to workspace
+ * @param {EnvPatches} patches config object for patches
+ * @param {boolean}    verbose global _verbose_ option
+ */
+exports.applyPatches = function (cwd, patches, verbose) {
+
+  patches.forEach(({ name, src, dest }) => {
+
+    LogTask.begin(`Applying patch for ${name}`);
+
+    const resolvedSrc = resolve(cwd, src);
+    const resolvedDest = resolve(cwd, 'instances', name, dest);
+    execSync(`patch ${resolvedDest} ${resolvedSrc}`, {
+      cwd,
+      stdio: verbose ? 'inherit' : 'ignore'
+    });
+
+    LogTask.end();
+
+  });
+
+};
+
+/**
  * Get the executable paths of the testing environment generators.
  * @param {string}        cwd       path to workspace
  * @param {string[]}      keys      template keys to retrieve the bin for
@@ -54,6 +79,7 @@ exports.getTemplateMain = function (cwd, templates) {
  * @param {TemplateMain} execs  paths to template executable files
  * @param {string}       cwd    path to workspace
  * @param {EnvModels}    models code-generator model definitions
+ * @param {boolean}      verbose global _verbose_ option
  */
 exports.generateCode = function (exec, cwd, models, verbose) {
 

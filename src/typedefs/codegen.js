@@ -1,8 +1,8 @@
 /**
  * @typedef  {Object} CodegenOptions Codegen command options
- * @property {boolean} gql generate graphql-server code
- * @property {boolean} spa generate single-page-app code
- * @property {boolean} verbose Global _verbose_ option
+ * @property {boolean} code    generate code only
+ * @property {boolean} patch   apply patches only
+ * @property {boolean} verbose global _verbose_ option
 **/
 
 /**

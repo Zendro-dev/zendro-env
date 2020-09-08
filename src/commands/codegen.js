@@ -1,6 +1,7 @@
-const { getConfig }     = require('../config/config');
-const { LogTask }       = require('../debug/task-logger');
+const { getConfig }                     = require('../config/config');
+const { LogTask }                       = require('../debug/task-logger');
 const {
+  applyPatches,
   generateCode,
   getTemplateMain
 } = require('../handlers/codegen');
@@ -13,13 +14,13 @@ exports.command  = 'codegen';
 exports.describe = 'Generate code for a testing environment.';
 
 exports.builder  = {
-  gql: {
-    describe: 'Generate graphql-server code',
+  code: {
+    describe: 'Generate code only',
     group: 'Codegen',
     type: 'boolean',
   },
-  spa: {
-    describe: 'Generate single-page-app code',
+  patch: {
+    describe: 'Apply patches only',
     group: 'Codegen',
     type: 'boolean',
   },
@@ -31,17 +32,27 @@ exports.builder  = {
  */
 exports.handler = (opts) => {
 
-  const { cwd, templates, models } = getConfig();
-  const { verbose } = opts;
+  const { cwd, models, patches, templates } = getConfig();
+  const { code, patch, verbose } = opts;
 
+  const defaultRun = !code && !patch;
 
   LogTask.verbose = verbose;
   LogTask.groupBegin('Running code generators');
 
-  const exec = getTemplateMain(cwd, templates);
-  generateCode(exec, cwd, models, verbose);
+  if (code || defaultRun) {
+
+    const exec = getTemplateMain(cwd, templates);
+    generateCode(exec, cwd, models, verbose);
+
+  }
+
+  if (patch || defaultRun) {
+
+    applyPatches(cwd, patches);
+
+  }
 
   LogTask.groupEnd();
-
 
 };
