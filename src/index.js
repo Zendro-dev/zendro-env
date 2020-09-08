@@ -1,5 +1,7 @@
 const yargs = require('yargs');
+//
 const { checkConfig } = require('./config/config');
+
 
 // Validate config file
 checkConfig();

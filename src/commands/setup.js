@@ -9,7 +9,7 @@ const {
   resetEnvironment,
 } = require('../handlers/setup');
 //
-require('../typedefs/setup');
+require('../typedefs');
 
 
 /* COMMAND */

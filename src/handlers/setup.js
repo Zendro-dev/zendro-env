@@ -3,8 +3,10 @@ const { resolve }  = require('path');
 const {
   copyFileSync, readFileSync, mkdirSync, rmdirSync, writeFileSync
 } = require('fs');
-
+//
 const { LogTask }   = require('../debug/task-logger');
+//
+require('../typedefs');
 
 
 /**

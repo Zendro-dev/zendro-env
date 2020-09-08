@@ -2,7 +2,7 @@ const { sync }         = require('find-up');
 const { readFileSync } = require('fs');
 const { cwd }          = require('process');
 //
-require('../typedefs/testenv');
+require('../typedefs');
 
 
 // Get config file path, if it exists
