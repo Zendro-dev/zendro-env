@@ -7,6 +7,9 @@
   },
   "main": "index.js",
   "license": "MIT",
+  "scripts": {
+    "lint": "eslint ."
+  },
   "dependencies": {
     "chalk": "^4.1.0",
     "find-up": "^5.0.0",
