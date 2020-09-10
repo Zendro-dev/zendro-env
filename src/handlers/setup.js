@@ -21,7 +21,7 @@ exports.cloneTemplates = function (paths, cwd, verbose) {
     LogTask.begin(`Cloning template: ${key}`);
 
     if (!source) execSync(
-      `git clone --branch ${branch || 'master'} ${url} ./templates/${key}`, {
+      `git clone --branch "${branch || 'master'}" ${url} ./templates/${key}`, {
         cwd,
         stdio: verbose ? 'inherit' : 'ignore',
       });
