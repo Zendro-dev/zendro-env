@@ -6,6 +6,7 @@
   },
   "parser": "babel-eslint",
   "extends": [
+    "eslint:recommended",
     "plugin:jest/recommended"
   ],
   "plugins": [
@@ -25,7 +26,6 @@
 
   },
   "ignorePatterns": [
-    "coverage",
-    "node_modules"
+    "coverage"
   ]
 }
