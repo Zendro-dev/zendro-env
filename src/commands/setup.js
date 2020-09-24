@@ -77,6 +77,6 @@ exports.handler = (opts) => {
     installWorkspace(cwd, verbose);
   }
 
-  LogTask.groupEnd();
+  LogTask.groupEnd('Completed workspace setup');
 
 };
