@@ -1,16 +1,17 @@
 /**
- * @typedef  {Object} TestEnvConfig Testing environment configuration
- * @property {string}        cwd       path to workspace
- * @property {TestInstances} instances testing instances
+ * @typedef  {Object} EnvConfig Testing environment configuration
+ * @property {string}        cwd       path to workspace folder
+ * @property {string}        docker    path to docker-compose file
+ * @property {EnvInstances} instances testing instances
  * @property {EnvModels}     models    codegen models
  * @property {EnvPatches}    patches   codegen patches
- * @property {TestTemplates} templates repository templates
+ * @property {EnvTemplates} templates repository templates
 **/
 
 //
 
 /**
- * @typedef  {Object} TestInstances Testing environment instances
+ * @typedef  {Object} EnvInstances Testing environment instances
  * @property {string[]} gql graphql-server instance definitions
  * @property {string[]} spa single-page-app instance definitions
 **/
@@ -23,9 +24,8 @@
 
 /**
  * @typedef  {Object} ModelDef Environment model definition
- * @property {string}   path  relative location of the model definitions
- * @property {string[]} gql   gql-server instances to which these models apply
- * @property {string[]} spa   spa instances to which these models apply
+ * @property {string}   path   relative location of the model definitions
+ * @property {string[]} target gql- and spa-instances to which these models apply
 **/
 
 //
@@ -44,7 +44,7 @@
 //
 
 /**
- * @typedef  {Object} TestTemplates Testing environment templates
+ * @typedef  {Object} EnvTemplates Testing environment templates
  * @property {TemplateDef} gql         graphql-server template
  * @property {TemplateDef} gql-codegen graphql-server-model-codegen template
  * @property {TemplateDef} spa         single-page-app template

@@ -23,7 +23,7 @@ const config = JSON.parse(
 
 /**
  * Get workspace configuration.
- * @returns {TestEnvConfig} custom environment configuration
+ * @returns {EnvConfig} custom environment configuration
  */
 exports.getConfig = function () {
 
