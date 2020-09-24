@@ -36,7 +36,7 @@ exports.applyPatches = function (cwd, patches, verbose) {
  * Get the executable paths of the testing environment generators.
  * @param {string}        cwd       path to workspace
  * @param {string[]}      keys      template keys to retrieve the bin for
- * @param {TestTemplates} templates template environment in the .testenv config
+ * @param {EnvTemplates} templates template environment in the .testenv config
  * @returns {TemplateMain} object of { key: 'path/to/main } values
  */
 exports.getTemplateMain = function (cwd, templates) {
@@ -76,47 +76,38 @@ exports.getTemplateMain = function (cwd, templates) {
 
 /**
  *
- * @param {TemplateMain} execs  paths to template executable files
- * @param {string}       cwd    path to workspace
- * @param {EnvModels}    models code-generator model definitions
- * @param {boolean}      verbose global _verbose_ option
+ * @param {TemplateMain} exec      paths to template executable files
+ * @param {string}       cwd       path to workspace
+ * @param {EnvInstances} instances environment instances object
+ * @param {ModelDef[]}   models    code-generator model definitions
+ * @param {boolean}      verbose   global _verbose_ option
  */
-exports.generateCode = function (exec, cwd, models, verbose) {
+exports.generateCode = function (exec, cwd, instances, models, verbose) {
 
-  const {
-    'gql-codegen': gqlCodegen,
-    'spa-codegen': spaCodegen
-  } = exec;
+  console.log(cwd);
 
-  models.forEach(({ path, gql, spa }) => {
+  models.forEach(({ path, target }) => {
 
-    gql.forEach(name => {
+    target.forEach(name => {
 
       LogTask.begin(`Generating code for ${name}`);
 
+      // Assign codegen input-output paths
       const inPath = path;
       const outPath = join('instances', name);
-      execSync(`node ${gqlCodegen} -f ${inPath} -o ${outPath}`, {
+
+      // Compose codegen command
+      const cmd = instances['gql'].includes(name)
+        ? `node ${exec['gql-codegen']} -f ${inPath} -o ${outPath}`
+        : `node ${exec['spa-codegen']} -f ${inPath} -o ${outPath} -P -D`;
+
+      // Generate code
+      execSync(cmd, {
         cwd,
         stdio: verbose ? 'inherit' : 'ignore',
       });
 
       LogTask.end('Generated code');
-
-    });
-
-    spa.forEach(name => {
-
-      LogTask.begin(`Generating code for ${name}`);
-
-      const inPath = path;
-      const outPath = join('instances', name);
-      execSync(`node ${spaCodegen} -f ${inPath} -o ${outPath} -P -D`, {
-        cwd,
-        stdio: verbose ? 'inherit' : 'ignore',
-      });
-
-      LogTask.end();
 
     });
 

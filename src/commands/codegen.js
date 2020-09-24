@@ -32,18 +32,18 @@ exports.builder  = {
  */
 exports.handler = (opts) => {
 
-  const { cwd, models, patches, templates } = getConfig();
+  const { cwd, instances, models, patches, templates } = getConfig();
   const { code, patch, verbose } = opts;
 
   const defaultRun = !code && !patch;
 
   LogTask.verbose = verbose;
-  LogTask.groupBegin('Running code generators');
+  LogTask.groupBegin('Generating instances code');
 
   if (code || defaultRun) {
 
     const exec = getTemplateMain(cwd, templates);
-    generateCode(exec, cwd, models, verbose);
+    generateCode(exec, cwd, instances, models, verbose);
 
   }
 
@@ -53,6 +53,6 @@ exports.handler = (opts) => {
 
   }
 
-  LogTask.groupEnd();
+  LogTask.groupEnd('Generated instances code');
 
 };
