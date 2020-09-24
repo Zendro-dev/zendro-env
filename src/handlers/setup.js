@@ -1,5 +1,5 @@
-const { execSync } = require('child_process');
-const { resolve }  = require('path');
+const { execSync }       = require('child_process');
+const { join, resolve }  = require('path');
 const {
   copyFileSync, readFileSync, mkdirSync, rmdirSync, writeFileSync
 } = require('fs');
@@ -69,7 +69,7 @@ exports.installWorkspace = function (cwd, verbose) {
 
   copyFileSync(
     resolve(__dirname, '../config/workspace.json'),
-    `${cwd}/package.json`
+    `${cwd}/package.json`,
   );
 
   execSync('yarn install', {
@@ -123,21 +123,7 @@ exports.renamePackages = function (cwd, names) {
  */
 exports.resetEnvironment = function (cwd, opt) {
 
-  let pathToReset;
-
-  switch (opt) {
-  case 'templates':
-    pathToReset = `${cwd}/templates`;
-    break;
-
-  case 'instances':
-    pathToReset = `${cwd}/instances`;
-    break;
-
-  default:
-    pathToReset = cwd;
-    break;
-  }
+  const pathToReset = opt ? join(cwd, opt) : cwd;
 
   LogTask.begin(`Removing "${pathToReset}"`);
 
