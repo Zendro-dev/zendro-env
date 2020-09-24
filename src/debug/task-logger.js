@@ -5,8 +5,8 @@ const { gray, green, red, yellow } = require('chalk');
 
 module.exports.LogTask = class LogTask {
 
-  static wrapBegin = gray('\n@@ ----------------------------');
-  static wrapEnd = gray('\n\n---------------------------- @@')
+  static wrapBegin = '\n---------------------------------------\n';
+  static wrapEnd   = '\n---------------------------------------\n\n'
 
   static _verbose = false;
   static get verbose () {
@@ -16,31 +16,28 @@ module.exports.LogTask = class LogTask {
     this._verbose = val;
   }
 
-
-  static groupBegin (msg) {
-
-    stdout.write(this.wrapBegin + '\n' + gray('@@', msg) + '\n');
-
-  }
-
-  static groupEnd () {
-
-    stdout.write(this.wrapEnd + '\n');
-
-  }
-
   static begin (msg) {
 
-    stdout.write(`\n@@ ${msg} ... `);
+    stdout.write(`  ${msg} ... `);
 
   }
 
   static end (msg) {
 
-    if (this.verbose)
-      stdout.write(`\n@@ ${msg} ...`, green('done'));
-    else
-      stdout.write(green('done'));
+    stdout.write(green('done\n'));
 
   }
+
+  static groupBegin (msg) {
+
+    stdout.write( gray(this.wrapBegin, `START: ${msg}`, this.wrapEnd) );
+
+  }
+
+  static groupEnd (msg) {
+
+    stdout.write( gray(this.wrapBegin, `END: ${msg}`, this.wrapEnd) );
+
+  }
+
 };
