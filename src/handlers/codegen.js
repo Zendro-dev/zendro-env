@@ -1,27 +1,42 @@
-const { execSync }             = require('child_process');
-const { readFileSync }         = require('fs');
-const { join, parse, resolve } = require('path');
+const { execSync }                  = require('child_process');
+const { readFileSync }              = require('fs');
+const { join, parse, resolve, sep } = require('path');
 //
-const { LogTask } = require('../debug/task-logger');
-//
-require('../typedefs');
+const { getInstancePath } = require('../config/helpers');
+const { LogTask }         = require('../debug/task-logger');
 
 
 /**
  *
  * @param {string}     cwd     path to workspace
- * @param {EnvPatches} patches config object for patches
+ * @param {PatchDef[]} patches config object for patches
  * @param {boolean}    verbose global _verbose_ option
  */
 exports.applyPatches = function (cwd, patches, verbose) {
 
-  patches.forEach(({ name, src, dest }) => {
+  patches.forEach(({ args, src, dest }) => {
 
-    LogTask.begin(`Applying patch for ${name}`);
+    LogTask.begin(`Applying patch: ${src}`);
 
-    const resolvedSrc = resolve(cwd, src);
-    const resolvedDest = resolve(cwd, 'instances', name, dest);
-    execSync(`patch ${resolvedDest} ${resolvedSrc}`, {
+    // Expand instance path if present
+    const rootDest     = dest.split(sep)[0];
+    const expandedPath = getInstancePath(rootDest);
+    const resolvedDest = expandedPath
+      ? dest.replace(rootDest, expandedPath)
+      : dest;
+
+    // Wrap _patch_ arguments in quotes if they contain whitespaces
+    const resolvedArgs = args
+      .map(arg => {
+
+        if (/\s/g.test(arg))
+          return `\\"${arg}\\"`;
+
+        return arg;
+      })
+      .join(' ');
+
+    execSync(`patch ${resolvedArgs} ${resolvedDest} ${src}`, {
       cwd,
       stdio: verbose ? 'inherit' : 'ignore'
     });
@@ -34,9 +49,14 @@ exports.applyPatches = function (cwd, patches, verbose) {
 
 /**
  * Get the executable paths of the testing environment generators.
- * @param {string}        cwd       path to workspace
- * @param {string[]}      keys      template keys to retrieve the bin for
- * @param {EnvTemplates} templates template environment in the .testenv config
+ *
+ * @typedef {Object} TemplateMain
+ * @property {string?} gql-codegen
+ * @property {string?} spa-codegen
+ *
+ * @param {string}         cwd       path to workspace
+ * @param {string[]}       keys      template keys to retrieve the bin for
+ * @param {EnvTemplates}   templates template environment in the .testenv config
  * @returns {TemplateMain} object of { key: 'path/to/main } values
  */
 exports.getTemplateMain = function (cwd, templates) {
@@ -46,7 +66,7 @@ exports.getTemplateMain = function (cwd, templates) {
    * @param {Object<string,string>} acc      accumulator object
    * @param {[string, TemplateDef]} template entry array of [key, TemplateDef]
    */
-  const reducer = (acc, template) => {
+  const pathReducer = (acc, template) => {
 
     const [ key, { source, url } ] = template;
 
@@ -60,17 +80,17 @@ exports.getTemplateMain = function (cwd, templates) {
       readFileSync( join(modulePath, 'package.json') )
     );
 
-    // Compose main path ("undefined" if main is not defined in package.json)
+    // Compose main path ("null" if main is not defined in package.json)
     const { main } = packageJson;
     const mainPath = main
       ? join(modulePath, packageJson.main)
-      : undefined;
+      : null;
 
     // Return a "{ key: 'path/to/main' }" object
     return Object.assign(acc, { [key]: mainPath });
   };
 
-  return Object.entries(templates).reduce(reducer, {});
+  return Object.entries(templates).reduce(pathReducer, {});
 
 };
 
@@ -96,7 +116,8 @@ exports.generateCode = function (exec, cwd, instances, models, verbose) {
       const inPath = path;
       const outPath = join('instances', name);
 
-      // Compose codegen command
+      // Compose codegen command depending on whether it is a graphql-server
+      // or single-page-app instance.
       const cmd = instances['gql'].includes(name)
         ? `node ${exec['gql-codegen']} -f ${inPath} -o ${outPath}`
         : `node ${exec['spa-codegen']} -f ${inPath} -o ${outPath} -P -D`;
