@@ -1,6 +1,6 @@
 const { stdout } = require('process');
 //
-const { gray, green, red, yellow } = require('chalk');
+const { gray, green, red, yellow,  } = require('chalk');
 
 
 module.exports.LogTask = class LogTask {
@@ -18,13 +18,19 @@ module.exports.LogTask = class LogTask {
 
   static begin (msg) {
 
-    stdout.write(`  ${msg} ... `);
+    if (this._verbose)
+      stdout.write(yellow(`${msg} ... \n\n`));
+    else
+      stdout.write(`${msg} ... `);
 
   }
 
-  static end (msg) {
+  static end () {
 
-    stdout.write(green('done\n'));
+    if (this._verbose)
+      stdout.write(green('\ndone\n\n'));
+    else
+      stdout.write(green('done\n'));
 
   }
 
