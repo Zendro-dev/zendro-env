@@ -2,7 +2,7 @@
  * @typedef  {Object} EnvConfig Testing environment configuration
  * @property {string}       cwd       path to workspace folder
  * @property {string}       docker    path to docker-compose file
- * @property {EnvInstances} instances testing instances
+ * @property {Service[]}    services  api and spa test services
  * @property {ModelDef[]}   models    codegen models
  * @property {PatchDef[]}   patches   codegen patches
  * @property {EnvTemplates} templates repository templates
@@ -11,9 +11,10 @@
 //
 
 /**
- * @typedef  {Object} EnvInstances Testing environment instances
- * @property {string[]} gql graphql-server instance definitions
- * @property {string[]} spa single-page-app instance definitions
+ * @typedef  {Object} Service Testing environment instances
+ * @property {string} template repository template to use
+ * @property {string} name     unique name of this service
+ * @property {number} port     public port for sending requests to this service
 **/
 
 //

@@ -31,29 +31,25 @@ exports.cloneTemplates = function (paths, cwd, verbose) {
 };
 
 /**
- * Clone GraphQL-Server and Single-Page-App instances.
- * @param {string} cwd path to current workspace
- * @param {string[]} names instance names
- * @param {string} key name of template repository
- * @param {string} branch branch to checkout
+ * Clone a new environment service.
+ * @param {string}  cwd      path to workspace folder
+ * @param {string}  template template to clone from
+ * @param {string}  name     unique name of the service
+ * @param {boolean} verbose  global verbose option
  */
-exports.cloneInstances = function (cwd, names, key, verbose) {
+exports.cloneService = function (cwd, template, name, verbose) {
 
-  names.forEach(name => {
+  LogTask.begin(`Cloning instance: ${name}`);
 
-    LogTask.begin(`Cloning instance: ${name}`);
+  const src = `./templates/${template}/.git`;
+  const dest = `services/${name}`;
 
-    const src = `./templates/${key}/.git`;
-    const dest = `instances/${name}`;
-
-    execSync(`git clone ${src} ${dest}`, {
-      cwd,
-      stdio: verbose ? 'inherit' : 'ignore',
-    });
-
-    LogTask.end();
-
+  execSync(`git clone ${src} ${dest}`, {
+    cwd,
+    stdio: verbose ? 'inherit' : 'ignore',
   });
+
+  LogTask.end();
 
 };
 
@@ -84,49 +80,48 @@ exports.installWorkspace = function (cwd, verbose) {
 };
 
 /**
- * Renames packages to their instance name. Unique package names are required
- * by `yarn workspaces` to install shared modules.
- * @param {string} cwd path to workspace
- * @param {string[]} names instance names
+ * Rename package to the provided name.
+ * @param {string} cwd path to workspace folder
+ * @param {string} name unique service name
  */
-exports.renamePackages = function (cwd, names) {
+exports.renamePackage = function (cwd, name) {
 
-  LogTask.begin(`Renaming packages: ${names.join(', ')}`);
+  LogTask.begin(`Renaming package: ${name}`);
 
-  names.forEach(name => {
+  // Read package.json
+  const packageJsonPath = `${cwd}/services/${name}/package.json`;
+  const packageJson = JSON.parse( readFileSync(packageJsonPath, {
+    encoding: 'utf-8'
+  }));
 
-    // Read package.json
-    const packageJsonPath = `${cwd}/instances/${name}/package.json`;
-    const packageJson = JSON.parse( readFileSync(packageJsonPath, {
-      encoding: 'utf-8'
-    }));
-
-    // Edit package.json#name
-    packageJson.name = name;
-    writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2), {
-      encoding: 'utf-8'
-    });
-
+  // Edit package.json#name
+  packageJson.name = name;
+  writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2), {
+    encoding: 'utf-8'
   });
 
   LogTask.end('Renamed packages');
-
 };
 
 /**
- * Create a clean testing environment.
- * WARNING: it will destroy any existing workspace in the same path.
+ * Fully or partially reset the testing environment.
+ *
+ * WARNING: The worspace folder, or the given subfolder name, will be removed and recreated anew.
+ *
  * @param {string}  cwd path to working directory
- * @param {string?} opt workspace folder to reset
+ * @param {string?} sub workspace folder to reset
  */
-exports.resetEnvironment = function (cwd, opt) {
+exports.resetEnvironment = function (cwd, sub, recreate = true) {
 
-  const pathToReset = opt ? join(cwd, opt) : cwd;
+  const pathToReset = sub ? join(cwd, sub) : cwd;
 
   LogTask.begin(`Removing "${pathToReset}"`);
 
   rmdirSync(pathToReset, { recursive: true });
-  mkdirSync(`${pathToReset}`, { recursive: true });
+
+  if (recreate) {
+    mkdirSync(`${pathToReset}`, { recursive: true });
+  }
 
   LogTask.end();
 

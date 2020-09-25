@@ -5,6 +5,6 @@
   "description": "Zendro integration-tests environment",
   "workspaces": [
     "templates/*-codegen",
-    "instances/*"
+    "services/*"
   ]
 }

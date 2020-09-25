@@ -3,9 +3,9 @@ const { LogTask }   = require('../debug/task-logger');
 //
 const {
   cloneTemplates,
-  cloneInstances,
+  cloneService,
   installWorkspace,
-  renamePackages,
+  renamePackage,
   resetEnvironment,
 } = require('../handlers/setup');
 
@@ -22,7 +22,7 @@ exports.builder = {
     group: 'Setup',
     type: 'boolean',
   },
-  instance: {
+  service: {
     describe: 'Clone instances in config file (requires templates)',
     group: 'Setup',
     type: 'boolean',
@@ -39,7 +39,7 @@ exports.builder = {
  *
  * @typedef  {Object} SetupOpts Setup command options.
  * @property {boolean} install  install modules (requires instances)
- * @property {boolean} instance clone instances (requires templates)
+ * @property {boolean} service  clone services (requires templates)
  * @property {boolean} template clone templates
  * @property {boolean} verbose  global _verbose_ option
  *
@@ -47,13 +47,13 @@ exports.builder = {
  */
 exports.handler = (opts) => {
 
-  const { cwd, instances, templates } = getConfig();
-  const { install, template, instance, verbose } = opts;
+  const { cwd, services, templates } = getConfig();
+  const { install, template, service, verbose } = opts;
 
   LogTask.verbose = verbose;
   LogTask.groupBegin('Setting up the workspace');
 
-  const defaultRun = !install && !instance && !template;
+  const defaultRun = !install && !service && !template;
 
   // Clone template repositories
   if (template || defaultRun) {
@@ -61,20 +61,23 @@ exports.handler = (opts) => {
     cloneTemplates(templates, cwd, verbose);
   }
 
-  // Setup instance repositories
-  if (instance || defaultRun) {
-    resetEnvironment(cwd, 'instances');
-    Object
-      .entries(instances)
-      .forEach(([key, names]) => {
+  // Setup service repositories
+  if (service || defaultRun) {
 
-        // Clone from templates
-        cloneInstances(cwd, names, key, verbose);
+    // Remove the services folder
+    resetEnvironment(cwd, 'services');
 
-        // Edit package.json#name (yarn workspaces requires unique names)
-        renamePackages(cwd, names);
+    // Setup new services
+    services.forEach(({ name, template }) => {
 
-      });
+      // Clone from template
+      cloneService(cwd, template, name, verbose);
+
+      // Edit package.json#name. Unique package names are required by
+      // `yarn workspaces` to install the shared modules.
+      renamePackage(cwd, name);
+
+    });
   }
 
   // Install the yarn-workspace
