@@ -1,11 +1,17 @@
 {
   "name": "zendro-test",
-  "version": "0.0.1",
-  "description": "Zendro tooling to manage an integration-tests environment",
+  "version": "0.1.0",
+  "description": "Zendro tooling to manage an integration testing environment",
   "bin": {
-    "zendro-test": "./src/index.js"
+    "zendro-env": "./src/index.js"
   },
   "main": "index.js",
+  "author": {
+    "name": "David Velasco"
+  },
+  "repository": {
+    "url": "https://github.com/Zendro-dev/zendro-integration-tests.git"
+  },
   "license": "MIT",
   "scripts": {
     "lint": "eslint ."
