@@ -1,10 +1,10 @@
 /**
  * @typedef  {Object} EnvConfig Testing environment configuration
- * @property {string}        cwd       path to workspace folder
- * @property {string}        docker    path to docker-compose file
+ * @property {string}       cwd       path to workspace folder
+ * @property {string}       docker    path to docker-compose file
  * @property {EnvInstances} instances testing instances
- * @property {EnvModels}     models    codegen models
- * @property {EnvPatches}    patches   codegen patches
+ * @property {ModelDef[]}   models    codegen models
+ * @property {PatchDef[]}   patches   codegen patches
  * @property {EnvTemplates} templates repository templates
 **/
 
@@ -19,10 +19,6 @@
 //
 
 /**
- * @typedef  {ModelDef[]} EnvModels Environment models
-**/
-
-/**
  * @typedef  {Object} ModelDef Environment model definition
  * @property {string}   path   relative location of the model definitions
  * @property {string[]} target gql- and spa-instances to which these models apply
@@ -31,14 +27,10 @@
 //
 
 /**
- * @typedef  {PatchDef[]} EnvPatches Environment patches configuration
-**/
-
-/**
  * @typedef  {Object} PatchDef Patch definition object
- * @property {string} name instance name
- * @property {string} src patch source file path
- * @property {string} dest file to be patched
+ * @property {string[]} args patch command arguments
+ * @property {string}   src  patch source file path
+ * @property {string}   dest file to be patched
 **/
 
 //

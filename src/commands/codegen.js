@@ -1,12 +1,10 @@
-const { getConfig }                     = require('../config/config');
-const { LogTask }                       = require('../debug/task-logger');
+const { getConfig } = require('../config/config');
+const { LogTask }   = require('../debug/task-logger');
 const {
   applyPatches,
   generateCode,
   getTemplateMain
 } = require('../handlers/codegen');
-//
-require('../typedefs');
 
 
 exports.command  = 'codegen';
@@ -28,7 +26,13 @@ exports.builder  = {
 
 /**
  * Command execution handler.
- * @param {CodegenOptions} opts codegen command options
+ *
+ * @typedef  {Object} CodegenOpts Codegen command options
+ * @property {boolean} code    generate code only
+ * @property {boolean} patch   apply patches only
+ * @property {boolean} verbose global _verbose_ option
+ *
+ * @param {CodegenOpts} opts codegen command options
  */
 exports.handler = (opts) => {
 
@@ -49,7 +53,7 @@ exports.handler = (opts) => {
 
   if (patch || defaultRun) {
 
-    applyPatches(cwd, patches);
+    applyPatches(cwd, patches, verbose);
 
   }
 

@@ -5,8 +5,6 @@ const {
 } = require('fs');
 //
 const { LogTask }   = require('../debug/task-logger');
-//
-require('../typedefs');
 
 
 /**

@@ -8,8 +8,6 @@ const {
   renamePackages,
   resetEnvironment,
 } = require('../handlers/setup');
-//
-require('../typedefs');
 
 
 /* COMMAND */
@@ -38,7 +36,14 @@ exports.builder = {
 
 /**
  * Command execution handler.
- * @param {SetupConfig} opts setup command options
+ *
+ * @typedef  {Object} SetupOpts Setup command options.
+ * @property {boolean} install  install modules (requires instances)
+ * @property {boolean} instance clone instances (requires templates)
+ * @property {boolean} template clone templates
+ * @property {boolean} verbose  global _verbose_ option
+ *
+ * @param {SetupOpts} opts setup command options
  */
 exports.handler = (opts) => {
 
