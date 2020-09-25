@@ -1,6 +1,6 @@
 const { execSync }                  = require('child_process');
-const { readFileSync }              = require('fs');
-const { join, parse, resolve, sep } = require('path');
+const { existsSync, readFileSync }              = require('fs');
+const { join, parse, resolve, sep, relative } = require('path');
 //
 const { getInstancePath } = require('../config/helpers');
 const { LogTask }         = require('../debug/task-logger');
@@ -48,90 +48,61 @@ exports.applyPatches = function (cwd, patches, verbose) {
 };
 
 /**
- * Get the executable paths of the testing environment generators.
  *
- * @typedef {Object} TemplateMain
- * @property {string?} gql-codegen
- * @property {string?} spa-codegen
- *
- * @param {string}         cwd       path to workspace
- * @param {string[]}       keys      template keys to retrieve the bin for
- * @param {EnvTemplates}   templates template environment in the .testenv config
- * @returns {TemplateMain} object of { key: 'path/to/main } values
+ * @param {string}      cwd      path to workspace folder
+ * @param {TemplateDef} template path to template folder
  */
-exports.getTemplateMain = function (cwd, templates) {
+exports.getTemplateMain = function (cwd, template) {
 
-  /**
-   * Reducer function to return the main file of each package.
-   * @param {Object<string,string>} acc      accumulator object
-   * @param {[string, TemplateDef]} template entry array of [key, TemplateDef]
-   */
-  const pathReducer = (acc, template) => {
+  // Resolve template path
+  const templatePath = template.source
+    ? parse(template.url).dir
+    : join('templates', template.name);
 
-    const [ key, { source, url } ] = template;
+  // Read module package.json
+  const packageJson = JSON.parse(
+    readFileSync( resolve(cwd, join(templatePath, 'package.json')) )
+  );
 
-    // Resolve path to module repository
-    const modulePath = source
-      ? resolve(cwd, parse(url).dir)
-      : resolve(cwd, 'templates', key);
+  // Compose main path ("null" if main is not defined in package.json)
+  const { main } = packageJson;
+  const mainPath = main
+    ? join(templatePath, packageJson.main)
+    : null;
 
-    // Read module package.json
-    const packageJson = JSON.parse(
-      readFileSync( join(modulePath, 'package.json') )
-    );
-
-    // Compose main path ("null" if main is not defined in package.json)
-    const { main } = packageJson;
-    const mainPath = main
-      ? join(modulePath, packageJson.main)
-      : null;
-
-    // Return a "{ key: 'path/to/main' }" object
-    return Object.assign(acc, { [key]: mainPath });
-  };
-
-  return Object.entries(templates).reduce(pathReducer, {});
-
+  return mainPath;
 };
 
 /**
- *
- * @param {TemplateMain} exec      paths to template executable files
- * @param {string}       cwd       path to workspace
- * @param {EnvInstances} instances environment instances object
- * @param {ModelDef[]}   models    code-generator model definitions
- * @param {boolean}      verbose   global _verbose_ option
+ * Generate code for a target service.
+ * @param {string}   cwd           path to workspace folder
+ * @param {string}   modelPath     path to code-generator model definitions folder
+ * @param {string[]} targetService path to target service folder
+ * @param {string}   codegenMain   path to code-generator main .js file
+ * @param {string}   codegenOpts   additional code-generator options
+ * @param {boolean}  verbose       global _verbose_ option
  */
-exports.generateCode = function (exec, cwd, instances, models, verbose) {
+exports.generateCode = function (
+  cwd, modelPath, targetService, codegenMain, codegenOpts, verbose
+) {
 
-  console.log(cwd);
+  LogTask.begin(`Generating code for ${targetService}`);
 
-  models.forEach(({ path, target }) => {
+  // Assign codegen input-output paths
+  const inPath  = modelPath;
+  const outPath = join('services', targetService);
 
-    target.forEach(name => {
+  // Compose codegen options if provided
+  const opts = codegenOpts
+    ? codegenOpts.join(' ')
+    : '';
 
-      LogTask.begin(`Generating code for ${name}`);
-
-      // Assign codegen input-output paths
-      const inPath = path;
-      const outPath = join('instances', name);
-
-      // Compose codegen command depending on whether it is a graphql-server
-      // or single-page-app instance.
-      const cmd = instances['gql'].includes(name)
-        ? `node ${exec['gql-codegen']} -f ${inPath} -o ${outPath}`
-        : `node ${exec['spa-codegen']} -f ${inPath} -o ${outPath} -P -D`;
-
-      // Generate code
-      execSync(cmd, {
-        cwd,
-        stdio: verbose ? 'inherit' : 'ignore',
-      });
-
-      LogTask.end('Generated code');
-
-    });
-
+  // Generate code
+  execSync(`node ${codegenMain} -f ${inPath} -o ${outPath} ${opts}`, {
+    cwd,
+    stdio: verbose ? 'inherit' : 'ignore',
   });
+
+  LogTask.end('Generated code');
 
 };

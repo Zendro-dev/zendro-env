@@ -1,8 +1,7 @@
 const { getConfig } = require('../config/config');
 const { LogTask }   = require('../debug/task-logger');
-//
 const {
-  cloneTemplates,
+  cloneTemplate,
   cloneService,
   installWorkspace,
   renamePackage,
@@ -58,7 +57,9 @@ exports.handler = (opts) => {
   // Clone template repositories
   if (template || defaultRun) {
     resetEnvironment(cwd, 'templates');
-    cloneTemplates(templates, cwd, verbose);
+
+    templates.forEach(template => cloneTemplate(cwd, template, verbose));
+
   }
 
   // Setup service repositories

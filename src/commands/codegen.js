@@ -3,7 +3,7 @@ const { LogTask }   = require('../debug/task-logger');
 const {
   applyPatches,
   generateCode,
-  getTemplateMain
+  getTemplateMain,
 } = require('../handlers/codegen');
 
 
@@ -36,7 +36,7 @@ exports.builder  = {
  */
 exports.handler = (opts) => {
 
-  const { cwd, instances, models, patches, templates } = getConfig();
+  const { cwd, services, models, patches, templates } = getConfig();
   const { code, patch, verbose } = opts;
 
   const defaultRun = !code && !patch;
@@ -46,8 +46,22 @@ exports.handler = (opts) => {
 
   if (code || defaultRun) {
 
-    const exec = getTemplateMain(cwd, templates);
-    generateCode(exec, cwd, instances, models, verbose);
+    models.forEach(({ path, opts, target }) => {
+
+      target.forEach(name => {
+
+        const { codegen } = services.find(service => service.name === name);
+        const template    = templates.find(({ name }) => name === codegen);
+
+        // Path to the code-generator main .js file
+        const codegenMain = getTemplateMain(cwd, template);
+
+        // Generate code using the appropriate generator.
+        generateCode(cwd, path, target, codegenMain, opts, verbose);
+
+      });
+
+    });
 
   }
 

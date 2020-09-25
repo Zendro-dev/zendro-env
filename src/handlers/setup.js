@@ -9,24 +9,22 @@ const { LogTask }   = require('../debug/task-logger');
 
 /**
  * Clone Zendro repository templates required to install the workspace.
- * @param {object} paths object containing branch and url information
- * @param {string} cwd path to working directory
+ * @param {string}      cwd      path to working directory
+ * @param {TemplateDef} template object containing branch and url information
  */
-exports.cloneTemplates = function (paths, cwd, verbose) {
+exports.cloneTemplate = function (cwd, template, verbose) {
 
-  Object.entries(paths).forEach(([key, { branch, url, source }]) => {
+  const { branch, name, source, url } = template;
 
-    LogTask.begin(`Cloning template: ${key}`);
+  LogTask.begin(`Cloning template: ${name}`);
 
-    if (!source) execSync(
-      `git clone --branch "${branch || 'master'}" ${url} ./templates/${key}`, {
-        cwd,
-        stdio: verbose ? 'inherit' : 'ignore',
-      });
+  if (!source) execSync(
+    `git clone --branch "${branch || 'master'}" ${url} ./templates/${name}`, {
+      cwd,
+      stdio: verbose ? 'inherit' : 'ignore',
+    });
 
-    LogTask.end();
-
-  });
+  LogTask.end();
 
 };
 
