@@ -1,18 +1,25 @@
+const { join, sep } = require('path');
 const { getConfig } = require('./config');
 
 
 /**
- * Get the path of a given instance name
- * @param {string}    name name of the instance
+ * Expand the first segment of a path if it matches the name of a known
+ * service.
+ * @param {string}    relativePath name of the instance
  * @returns {string?} path to the instance name or null
  */
-exports.getInstancePath = (name) => {
+exports.expandPath = function (relativePath) {
 
-  const { instances } = getConfig();
+  const { services } = getConfig();
 
-  const type = Object
-    .keys(instances)
-    .find(key => instances[key].includes(name));
+  // First segment of the path to expand
+  const serviceName  = relativePath.split(sep)[0];
 
-  return type ? `instances/${name}` : null;
+  // Search for the segment name in known services
+  const match = services.find(service => service.name === serviceName);
+
+  return match
+    ? relativePath.replace(serviceName, join('services', serviceName))
+    : null;
+
 };

@@ -30,7 +30,7 @@
 
 /**
  * @typedef  {Object} PatchDef Patch definition object
- * @property {string[]} args patch command arguments
+ * @property {string[]} opts patch command arguments
  * @property {string}   src  patch source file path
  * @property {string}   dest file to be patched
 **/

@@ -1,5 +1,6 @@
-const { getConfig } = require('../config/config');
-const { LogTask }   = require('../debug/task-logger');
+const { getConfig }  = require('../config/config');
+const { expandPath } = require('../config/helpers');
+const { LogTask }    = require('../debug/task-logger');
 const {
   applyPatches,
   generateCode,
@@ -48,16 +49,16 @@ exports.handler = (opts) => {
 
     models.forEach(({ path, opts, target }) => {
 
-      target.forEach(name => {
+      target.forEach(targetService => {
 
-        const { codegen } = services.find(service => service.name === name);
+        const { codegen } = services.find(service => service.name === targetService);
         const template    = templates.find(({ name }) => name === codegen);
 
         // Path to the code-generator main .js file
         const codegenMain = getTemplateMain(cwd, template);
 
         // Generate code using the appropriate generator.
-        generateCode(cwd, path, target, codegenMain, opts, verbose);
+        generateCode(cwd, path, targetService, codegenMain, opts, verbose);
 
       });
 
@@ -67,7 +68,13 @@ exports.handler = (opts) => {
 
   if (patch || defaultRun) {
 
-    applyPatches(cwd, patches, verbose);
+    patches.forEach(patch => {
+
+      const dest = expandPath(patch.dest) ?? patch.dest;
+
+      applyPatches(cwd, patch.src, dest, patch.opts, verbose);
+
+    });
 
   }
 

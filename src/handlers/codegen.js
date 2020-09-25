@@ -1,49 +1,38 @@
-const { execSync }                  = require('child_process');
-const { existsSync, readFileSync }              = require('fs');
-const { join, parse, resolve, sep, relative } = require('path');
-//
-const { getInstancePath } = require('../config/helpers');
-const { LogTask }         = require('../debug/task-logger');
+const { execSync }             = require('child_process');
+const { readFileSync }         = require('fs');
+const { join, parse, resolve } = require('path');
+const { LogTask }              = require('../debug/task-logger');
 
 
 /**
  *
- * @param {string}     cwd     path to workspace
- * @param {PatchDef[]} patches config object for patches
- * @param {boolean}    verbose global _verbose_ option
+ * @param {string}   cwd     path to workspace
+ * @param {string}   src     path to patch source file
+ * @param {string}   dest    path to patch destination file
+ * @param {string[]} opts    array of patch options
+ * @param {boolean}  verbose global _verbose_ option
  */
-exports.applyPatches = function (cwd, patches, verbose) {
+exports.applyPatches = function (cwd, src, dest, opts, verbose) {
 
-  patches.forEach(({ args, src, dest }) => {
+  LogTask.begin(`Applying patch: ${src}`);
 
-    LogTask.begin(`Applying patch: ${src}`);
+  // Wrap patch options in quotes if they contain whitespaces
+  const resolvedArgs = opts
+    .map(arg => {
 
-    // Expand instance path if present
-    const rootDest     = dest.split(sep)[0];
-    const expandedPath = getInstancePath(rootDest);
-    const resolvedDest = expandedPath
-      ? dest.replace(rootDest, expandedPath)
-      : dest;
+      if (/\s/g.test(arg))
+        return `\\"${arg}\\"`;
 
-    // Wrap _patch_ arguments in quotes if they contain whitespaces
-    const resolvedArgs = args
-      .map(arg => {
+      return arg;
+    })
+    .join(' ');
 
-        if (/\s/g.test(arg))
-          return `\\"${arg}\\"`;
-
-        return arg;
-      })
-      .join(' ');
-
-    execSync(`patch ${resolvedArgs} ${resolvedDest} ${src}`, {
-      cwd,
-      stdio: verbose ? 'inherit' : 'ignore'
-    });
-
-    LogTask.end();
-
+  execSync(`patch ${resolvedArgs} ${dest} ${src}`, {
+    cwd,
+    stdio: verbose ? 'inherit' : 'ignore'
   });
+
+  LogTask.end();
 
 };
 
