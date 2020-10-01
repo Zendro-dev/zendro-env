@@ -1,79 +1,112 @@
-const { execSync } = require('child_process');
-const { LogTask }  = require('../debug/task-logger');
+const { command }        = require('execa');
+const { default: fetch } = require('node-fetch');
+const { Observable }     = require('rxjs');
+const { promisify }      = require('util');
 
-require('../config/typings');
+const sleep = promisify(setTimeout);
+
 
 /**
  * Check the docker services are up and ready to take requests.
- * @param {string}       cwd     path to workspace folder
- * @param {Service} instances environment instances
- * @param {boolean}      verbose global _verbose_ option
+ * @param {string}      cwd path to workspace folder
+ * @param {Service} service environment services
+ * @param {boolean} verbose global _verbose_ option
  */
-exports.checkDockerEnv = function (cwd, instances, verbose) {
+exports.checkDockerEnv = async function (service, maxConnectionAttempts = 5) {
 
+  return new Observable(async observer => {
+
+    const { name, url } = service;
+
+    // Fetch users from the graphql-server
+    // TODO: adapt "connect" for the SPA service
+    const connect = () => fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ query: '{ users (pagination: { limit: 1 }) { id } }' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    // Attempt to fetch from the service
+    observer.next(`Connecting to ${name}`);
+    let response;
+    let attempts = 0;
+    while (!response && attempts <= maxConnectionAttempts) {
+      try {
+        response = await connect();
+      }
+      catch (error) {
+        attempts++;
+        await sleep(2000);
+        observer.next(
+          `Service "${name}" is not responding -- retrying (${attempts}/${maxConnectionAttempts})`
+        );
+      }
+    }
+
+    // Complete the observer
+    if (!response) {
+      observer.error(new Error(`Connection to "${name}" @ ${url} failed`));
+    }
+    else if (!response.ok) {
+      observer.next(`Service ${name} responded with errors`);
+    }
+    else {
+      observer.next(`Connected to ${name} @ ${url}`);
+    }
+
+    observer.complete();
+
+  });
 
 };
 
 /**
  * Destroy docker-compose containers, images, and volumes.
- * @param {string}  cwd     path to workspace folder
- * @param {string}  docker  path to docker-compose.yml file
+ * @param {string}      cwd path to workspace folder
+ * @param {string}   docker path to docker-compose.yml file
  * @param {boolean} verbose global _verbose_ option
  */
-exports.destroyDockerEnv = function (cwd, docker, verbose) {
+exports.destroyDockerEnv = async function (cwd, docker, verbose) {
 
   const flags = '-v --rmi all';
 
-  LogTask.begin(`Destroy ${docker} environment`);
-
-  execSync(`docker-compose -f ${docker} down ${flags}`, {
+  await command(`docker-compose -f ${docker} down ${flags}`, {
     cwd,
     stdio: verbose ? 'inherit' : 'ignore',
   });
-
-  LogTask.end();
 
 };
 
 /**
  * Remove the docker-compose containers and volumes (not images).
- * @param {string}  cwd     path to workspace folder
- * @param {string}  docker  path to docker-compose.yml file
+ * @param {string}      cwd path to workspace folder
+ * @param {string}   docker path to docker-compose.yml file
  * @param {boolean} verbose global _verbose_ option
  */
-exports.downContainers = function (cwd, docker, verbose) {
+exports.downContainers = async function (cwd, docker, verbose) {
 
   const flags = '-v';
 
-  LogTask.begin(`Down ${docker}`);
-
-  execSync(`docker-compose -f ${docker} down ${flags}`, {
+  await command(`docker-compose -f ${docker} down ${flags}`, {
     cwd,
     stdio: verbose ? 'inherit' : 'ignore',
   });
-
-  LogTask.end();
 };
 
 /**
  * Run the a detached docker-compose environment, remove orphans, and recreate
  * containers.
- * @param {string}  cwd     path to workspace folder
- * @param {string}  docker  path to docker-compose.yml file
+ * @param {string}      cwd path to workspace folder
+ * @param {string}   docker path to docker-compose.yml file
  * @param {boolean} verbose global _verbose_ option
  */
-exports.upContainers = function (cwd, docker, verbose) {
+exports.upContainers = async function (cwd, docker, verbose) {
 
   const flags = '-d --force-recreate --remove-orphans --renew-anon-volumes';
 
-
-  LogTask.begin(`Up ${docker}`);
-
-  execSync(`docker-compose -f ${docker} up ${flags}`, {
+  await command(`docker-compose -f ${docker} up ${flags}`, {
     cwd,
-    stdio: verbose ? 'inherit' : 'ignore',
+    stdio: verbose ? 'inherit' : 'ignore'
   });
-
-  LogTask.end();
 
 };

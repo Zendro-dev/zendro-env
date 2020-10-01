@@ -1,7 +1,7 @@
 {
   "name": "zendro-env",
-  "version": "0.1.0",
-  "description": "Zendro tooling to manage an integration testing environment",
+  "version": "0.2.0",
+  "description": "Zendro tooling to setup and manage a testing environment",
   "bin": {
     "zendro-env": "./bin/zendro-env"
   },
@@ -18,7 +18,13 @@
   },
   "dependencies": {
     "chalk": "^4.1.0",
+    "execa": "^4.0.3",
     "find-up": "^5.0.0",
+    "listr": "^0.14.3",
+    "listr-update-renderer": "^0.5.0",
+    "listr-verbose-renderer": "^0.6.0",
+    "node-fetch": "^2.6.1",
+    "rxjs": "^6.6.3",
     "yargs": "^15.4.1"
   },
   "devDependencies": {

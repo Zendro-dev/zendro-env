@@ -1,9 +1,13 @@
-const { getConfig } = require('../config/config');
-const { LogTask }   = require('../debug/task-logger');
+const Listr           = require('listr');
+const VerboseRenderer = require('listr-verbose-renderer');
+const UpdaterRenderer = require('listr-update-renderer');
+const { getConfig }   = require('../config/config');
 const {
+  checkDockerEnv,
+  downContainers,
   upContainers,
-  downContainers
 } = require('../handlers/docker');
+
 
 
 exports.command = 'docker';
@@ -11,11 +15,10 @@ exports.command = 'docker';
 exports.describe = 'Manage the docker configuration';
 
 exports.builder = {
-  up: {
-    describe: 'Up docker containers',
+  check: {
+    describe: 'Check that services are ready to take requests',
     group: 'Docker',
     type: 'boolean',
-    conflicts: 'down',
   },
   down: {
     describe: 'Down docker containers',
@@ -23,37 +26,66 @@ exports.builder = {
     type: 'boolean',
     conflicts: 'up',
   },
+  up: {
+    describe: 'Up docker containers',
+    group: 'Docker',
+    type: 'boolean',
+    conflicts: 'down',
+  },
 };
 
 /**
  * Command execution handler.
  *
- * @typedef {Object} DockerOpts
- * @property {boolean} up   launch up docker containers (conflicts: down)
- * @property {boolean} down take down docker containers (conflicts: up)
+ * @typedef  {Object} DockerOpts
+ * @property {boolean}   up  launch up docker containers (conflicts: down)
+ * @property {boolean} down  take down docker containers (conflicts: up)
+ * @property {boolean} check check that services are ready to take requests
  *
  * @param {DockerOpts} opts docker command options
  */
-exports.handler = (opts) => {
+exports.handler = async (opts) => {
 
-  const { cwd, docker }       = getConfig();
-  const { down, up, verbose } = opts;
+  const { cwd, docker, services }    = getConfig();
+  const { check, down, up, verbose } = opts;
 
-  LogTask.verbose = opts.verbose;
-  LogTask.groupBegin('Executing docker commands');
+  const defaultRun = !check && !down && !up;
 
-  const defaultRun = !down && !up;
+  const tasks = new Listr(
+    [
+      {
+        title: `Up ${docker}`,
+        task: () => upContainers(cwd, docker, verbose),
+        enabled: () => up || defaultRun,
+      },
+      {
+        title: `Down ${docker}`,
+        task: () => downContainers(cwd, docker, verbose),
+        enabled: () => down,
+      },
+      {
+        title: 'Check service connections',
+        task: () => new Listr(
+          services.map(server => ({
 
-  if (up || defaultRun) {
-    upContainers(cwd, docker, verbose);
-  }
+            title: `${server.name}`,
+            task: () => checkDockerEnv(server)
 
-  if (down) {
-    downContainers(cwd, docker, verbose);
-  }
+          })),
+          {
+            concurrent: true,
+            exitOnError: false,
+          }
+        ),
+        enabled: () => check || defaultRun,
+      },
+    ],
+    {
+      renderer: verbose ? VerboseRenderer : UpdaterRenderer,
+      collapse: false,
+    }
+  );
 
-
-  LogTask.groupEnd('Executed docker commands');
-
+  tasks.run().catch(err => { /* console.error */ });
 
 };
