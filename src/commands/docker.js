@@ -38,9 +38,10 @@ exports.builder = {
  * Command execution handler.
  *
  * @typedef  {Object} DockerOpts
- * @property {boolean}   up  launch up docker containers (conflicts: down)
- * @property {boolean} down  take down docker containers (conflicts: up)
- * @property {boolean} check check that services are ready to take requests
+ * @property {boolean}      up
+ * @property {boolean}    down
+ * @property {boolean}   check
+ * @property {boolean} verbose
  *
  * @param {DockerOpts} opts docker command options
  */

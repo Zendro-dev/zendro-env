@@ -34,11 +34,11 @@ exports.builder = {
  * Destroy command execution handler.
  *
  * @typedef  {Object} DestroyOpts
- * @property {boolean} image
- * @property {boolean} modules
- * @property {boolean} service
+ * @property {boolean}    image
+ * @property {boolean}  modules
+ * @property {boolean}  service
  * @property {boolean} template
- * @property {boolean} verbose
+ * @property {boolean}  verbose
  *
  * @param {DestroyOpts} opts setup command options
  */
