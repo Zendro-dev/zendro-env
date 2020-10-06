@@ -102,7 +102,7 @@ exports.installWorkspace = async function (cwd, verbose) {
     try {
       observer.next(`Creating package.json in ${cwd}`);
       await copyFile(
-        resolve(__dirname, '../config/workspace.jsonz'),
+        resolve(__dirname, '../config/workspace.json'),
         `${cwd}/package.json`,
       );
 
@@ -145,8 +145,8 @@ exports.resetEnvironment = async function (cwd, folderName, recreate = true) {
       observer.next(`Removing ${pathToReset}`);
       await rmdir(pathToReset, { recursive: true });
 
-      observer.next(`Recreating ${pathToReset}`);
       if (recreate) {
+        observer.next(`Recreating ${pathToReset}`);
         await mkdir(`${pathToReset}`, { recursive: true });
       }
     } catch (error) {

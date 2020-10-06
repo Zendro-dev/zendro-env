@@ -6,6 +6,16 @@ const { resetEnvironment } = require('../handlers/setup');
 const { destroyDockerEnv } = require('../handlers/docker');
 
 
+/* TASKS */
+
+const destroyDocker = (title, cwd, docker, verbose, enabled) => ({
+  title,
+  task: () => destroyDockerEnv(cwd, docker, verbose),
+  enabled,
+});
+
+/* COMMAND */
+
 exports.command = 'destroy';
 
 exports.describe = 'Remove a testing environment.';
@@ -31,6 +41,10 @@ exports.builder = {
     group: 'Destroy',
     type: 'boolean'
   },
+};
+
+exports.destroyTasks = {
+  destroyDocker,
 };
 
 /**

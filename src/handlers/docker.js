@@ -12,7 +12,7 @@ const sleep = promisify(setTimeout);
  * @param {Service} service environment services
  * @param {boolean} verbose global _verbose_ option
  */
-exports.checkDockerEnv = async function (service, maxConnectionAttempts = 5) {
+exports.checkDockerEnv = async function (service, maxConnectionAttempts = 10) {
 
   return new Observable(async observer => {
 

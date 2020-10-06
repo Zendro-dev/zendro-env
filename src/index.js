@@ -38,6 +38,6 @@ yargs
   .demandCommand()            // a command must be provided
   .options(globalOpts)        // add global options
   .strict()                   // do not allow unknown options
-  .wrap(120)                  // adjust stdout to 100 columns
+  .wrap(100)                  // adjust stdout to 100 columns
   .usage(usage)               // add custom usage message
   .parse();                   // parse and execute command handlers

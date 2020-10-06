@@ -8,7 +8,62 @@ const {
   upContainers,
 } = require('../handlers/docker');
 
+/* TASKS */
 
+/**
+ * Checks whether docker services are ready to accept requests.
+ * @param {string}          title task title
+ * @param {Service[]}    services list of services
+ * @param {boolean}       verbose global _verbose_option
+ * @param {() => boolean} enabled whether the task is enabled
+ */
+const checkDockerServiceConnections = (title, services, verbose, enabled) => ({
+  title,
+  task: () => new Listr(
+    services.map(server => ({
+
+      title: `${server.name}`,
+      task: () => checkDockerEnv(server)
+
+    })),
+    {
+      concurrent: verbose ? false : true,
+      exitOnError: false,
+    }
+  ),
+  enabled,
+});
+
+/**
+ * Stop services, remove containers and volumes.
+ * @param {string}          title task title
+ * @param {string}            cwd path to working directory
+ * @param {string}         docker path to docker-compose file
+ * @param {boolean}       verbose global _verbose_option
+ * @param {() => boolean} enabled whether the task is enabled
+ */
+const downDockerContainers = (title, cwd, docker, verbose, enabled) => ({
+  title,
+  task: () => downContainers(cwd, docker, verbose),
+  enabled,
+});
+
+/**
+ * Recreate containers, renew volumes, and remove orphans.
+ * @param {string}          title task title
+ * @param {string}            cwd path to working directory
+ * @param {string}         docker path to docker-compose file
+ * @param {boolean}       verbose global _verbose_option
+ * @param {() => boolean} enabled whether the task is enabled
+ */
+const upDockerContainers = (title, cwd, docker, verbose, enabled) => ({
+  title,
+  task: () => upContainers(cwd, docker, verbose),
+  enabled,
+});
+
+
+/* COMMAND */
 
 exports.command = 'docker';
 
@@ -34,6 +89,12 @@ exports.builder = {
   },
 };
 
+exports.dockerTasks = {
+  checkDockerServiceConnections,
+  downDockerContainers,
+  upDockerContainers,
+};
+
 /**
  * Command execution handler.
  *
@@ -54,32 +115,21 @@ exports.handler = async (opts) => {
 
   const tasks = new Listr(
     [
-      {
-        title: `Up ${docker}`,
-        task: () => upContainers(cwd, docker, verbose),
-        enabled: () => up || defaultRun,
-      },
-      {
-        title: `Down ${docker}`,
-        task: () => downContainers(cwd, docker, verbose),
-        enabled: () => down,
-      },
-      {
-        title: 'Check service connections',
-        task: () => new Listr(
-          services.map(server => ({
-
-            title: `${server.name}`,
-            task: () => checkDockerEnv(server)
-
-          })),
-          {
-            concurrent: true,
-            exitOnError: false,
-          }
-        ),
-        enabled: () => check || defaultRun,
-      },
+      upDockerContainers(
+        `Up ${docker}`,
+        cwd, docker, verbose,
+        () => up || defaultRun
+      ),
+      downDockerContainers(
+        `Down ${docker}`,
+        cwd, docker, verbose,
+        () => down
+      ),
+      checkDockerServiceConnections(
+        'Check service connections',
+        services, verbose,
+        () => check || defaultRun,
+      )
     ],
     {
       renderer: verbose ? VerboseRenderer : UpdaterRenderer,

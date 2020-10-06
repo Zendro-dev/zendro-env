@@ -11,7 +11,7 @@ const { expandPath }           = require('../config/helpers');
  * @param {Patch}     patch patch definition
  * @param {boolean} verbose global _verbose_ option
  */
-exports.applyPatches = async function (cwd, patch, verbose) {
+exports.applyPatch = async function (cwd, patch, verbose) {
 
   // Wrap patch options in quotes if they contain whitespaces
   const resolvedArgs = patch.opts
