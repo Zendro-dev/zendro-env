@@ -1,53 +1,93 @@
-const { execSync }       = require('child_process');
-const { join, resolve }  = require('path');
-const {
-  copyFileSync, readFileSync, mkdirSync, rmdirSync, writeFileSync
-} = require('fs');
-//
-const { LogTask }   = require('../debug/task-logger');
+const { command }                                     = require('execa');
+const { copyFile, readFile, mkdir, rmdir, writeFile } = require('fs/promises');
+const { join, resolve }                               = require('path');
+const { Observable }                                  = require('rxjs');
 
 
 /**
  * Clone Zendro repository templates required to install the workspace.
- * @param {string}      cwd      path to working directory
- * @param {TemplateDef} template object containing branch and url information
+ * @param {string}        cwd path to working directory
+ * @param {Template} template object containing branch and url information
  */
-exports.cloneTemplate = function (cwd, template, verbose) {
+exports.cloneTemplate = async function (cwd, template, verbose) {
 
-  const { branch, name, source, url } = template;
+  return new Observable(async observer => {
 
-  LogTask.begin(`Cloning template: ${name}`);
+    const { branch, name, url } = template;
 
-  if (!source) execSync(
-    `git clone --branch "${branch || 'master'}" ${url} ./templates/${name}`, {
-      cwd,
-      stdio: verbose ? 'inherit' : 'ignore',
-    });
+    observer.next(`cloning ${url}`);
 
-  LogTask.end();
+    try {
+      await command(
+        `git clone --branch ${branch || 'master'} ${url} ./templates/${name}`, {
+          cwd,
+          stdio: verbose ? 'inherit' : 'pipe',
+        });
+    }
+    catch (error) {
+      if (verbose) observer.next(error.message);
+      observer.error(new Error(`Failed cloning ${url}`));
+    }
+
+    observer.complete();
+
+  });
 
 };
 
 /**
  * Clone a new environment service.
- * @param {string}  cwd      path to workspace folder
+ * @param {string}       cwd path to workspace folder
  * @param {string}  template template to clone from
- * @param {string}  name     unique name of the service
- * @param {boolean} verbose  global verbose option
+ * @param {string}      name unique name of the service
+ * @param {boolean}  verbose global verbose option
  */
-exports.cloneService = function (cwd, template, name, verbose) {
+exports.cloneService = async function (cwd, template, name, verbose) {
 
-  LogTask.begin(`Cloning instance: ${name}`);
+  return new Observable(async observer => {
 
-  const src = `./templates/${template}/.git`;
-  const dest = `services/${name}`;
+    const src = `./templates/${template}/.git`;
+    const dest = `services/${name}`;
 
-  execSync(`git clone ${src} ${dest}`, {
-    cwd,
-    stdio: verbose ? 'inherit' : 'ignore',
+    observer.next(`cloning ${src}`);
+
+    try {
+      await command(`git clone ${src} ${dest}`, {
+        cwd,
+        stdio: verbose ? 'inherit' : 'pipe'
+      });
+    }
+    catch (err) {
+      if (verbose) {
+        observer.next(err.message);
+      }
+      observer.error(new Error(`Failed cloning ${src}`));
+    }
+
+    /**
+     * Edit package.json#name. Unique package names are required by
+     * yarn workspaces to install the shared modules.
+     */
+
+    // Read package.json
+    const packageJsonPath = `${cwd}/services/${name}/package.json`;
+    observer.next(`reading ${packageJsonPath}`);
+
+    const jsonString = await readFile(packageJsonPath, {
+      encoding: 'utf-8'
+    });
+    const packageJson = JSON.parse(jsonString);
+
+    // Edit package.json#name
+    observer.next(`renaming ${packageJson.name} -> ${name}`);
+    packageJson.name = name;
+    await writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2), {
+      encoding: 'utf-8'
+    });
+
+    observer.complete();
+
   });
-
-  LogTask.end();
 
 };
 
@@ -55,50 +95,36 @@ exports.cloneService = function (cwd, template, name, verbose) {
  * Install modules for all workspace packages.
  * @param {string} cwd path to workspace
  */
-exports.installWorkspace = function (cwd, verbose) {
+exports.installWorkspace = async function (cwd, verbose) {
 
-  LogTask.begin('Installing workspace modules');
+  return new Observable(async observer => {
 
-  copyFileSync(
-    resolve(__dirname, '../config/workspace.json'),
-    `${cwd}/package.json`,
-  );
+    try {
+      observer.next(`Creating package.json in ${cwd}`);
+      await copyFile(
+        resolve(__dirname, '../config/workspace.jsonz'),
+        `${cwd}/package.json`,
+      );
 
-  execSync('yarn install', {
-    cwd,
-    env: {
-      ...process.env,
-      NODE_JQ_SKIP_INSTALL_BINARY: true
-    },
-    stdio: verbose ? 'inherit' : 'ignore'
+      observer.next('Installing node modules');
+      await command('yarn install', {
+        cwd,
+        env: {
+          ...process.env,
+          NODE_JQ_SKIP_INSTALL_BINARY: true
+        },
+        stdio: verbose ? 'inherit' : 'pipe'
+      });
+
+    }
+    catch (error) {
+      observer.error(error);
+    }
+
+    observer.complete();
+
   });
 
-  LogTask.end();
-
-};
-
-/**
- * Rename package to the provided name.
- * @param {string} cwd path to workspace folder
- * @param {string} name unique service name
- */
-exports.renamePackage = function (cwd, name) {
-
-  LogTask.begin(`Renaming package: ${name}`);
-
-  // Read package.json
-  const packageJsonPath = `${cwd}/services/${name}/package.json`;
-  const packageJson = JSON.parse( readFileSync(packageJsonPath, {
-    encoding: 'utf-8'
-  }));
-
-  // Edit package.json#name
-  packageJson.name = name;
-  writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2), {
-    encoding: 'utf-8'
-  });
-
-  LogTask.end('Renamed packages');
 };
 
 /**
@@ -106,21 +132,29 @@ exports.renamePackage = function (cwd, name) {
  *
  * WARNING: The worspace folder, or the given subfolder name, will be removed and recreated anew.
  *
- * @param {string}  cwd path to working directory
- * @param {string?} sub workspace folder to reset
+ * @param {string}         cwd path to working directory
+ * @param {string?} folderName workspace folder to reset
  */
-exports.resetEnvironment = function (cwd, sub, recreate = true) {
+exports.resetEnvironment = async function (cwd, folderName, recreate = true) {
 
-  const pathToReset = sub ? join(cwd, sub) : cwd;
+  return new Observable(async observer => {
 
-  LogTask.begin(`Removing "${pathToReset}"`);
+    const pathToReset = folderName ? join(cwd, folderName) : cwd;
 
-  rmdirSync(pathToReset, { recursive: true });
+    try {
+      observer.next(`Removing ${pathToReset}`);
+      await rmdir(pathToReset, { recursive: true });
 
-  if (recreate) {
-    mkdirSync(`${pathToReset}`, { recursive: true });
-  }
+      observer.next(`Recreating ${pathToReset}`);
+      if (recreate) {
+        await mkdir(`${pathToReset}`, { recursive: true });
+      }
+    } catch (error) {
+      observer.error(error);
+    }
 
-  LogTask.end();
+    observer.complete();
+
+  });
 
 };

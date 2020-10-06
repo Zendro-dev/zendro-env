@@ -1,10 +1,11 @@
-const { getConfig } = require('../config/config');
-const { LogTask }   = require('../debug/task-logger');
+const Listr           = require('listr');
+const VerboseRenderer = require('listr-verbose-renderer');
+const UpdaterRenderer = require('listr-update-renderer');
+const { getConfig }   = require('../config/config');
 const {
   cloneTemplate,
   cloneService,
   installWorkspace,
-  renamePackage,
   resetEnvironment,
 } = require('../handlers/setup');
 
@@ -37,10 +38,10 @@ exports.builder = {
  * Command execution handler.
  *
  * @typedef  {Object} SetupOpts Setup command options.
- * @property {boolean} install  install modules (requires instances)
- * @property {boolean} service  clone services (requires templates)
+ * @property {boolean}  install install modules (requires instances)
+ * @property {boolean}  service clone services (requires templates)
  * @property {boolean} template clone templates
- * @property {boolean} verbose  global _verbose_ option
+ * @property {boolean}  verbose global _verbose_ option
  *
  * @param {SetupOpts} opts setup command options
  */
@@ -49,43 +50,67 @@ exports.handler = (opts) => {
   const { cwd, services, templates } = getConfig();
   const { install, template, service, verbose } = opts;
 
-  LogTask.verbose = verbose;
-  LogTask.groupBegin('Setting up the workspace');
-
   const defaultRun = !install && !service && !template;
 
-  // Clone template repositories
-  if (template || defaultRun) {
-    resetEnvironment(cwd, 'templates');
+  const tasks = new Listr([
+    {
+      title: 'Set up templates',
+      task: () => new Listr([
+        {
+          title: 'Remove templates folder',
+          task: () => resetEnvironment(cwd, 'templates'),
+        },
+        {
+          title: 'Clone templates from upstream',
+          task: () => new Listr(
+            templates.map(template => ({
+              title: template.name,
+              task: () => cloneTemplate(cwd, template, verbose),
+              skip: () => template.source
+                ? `Using ${template.name} as source.`
+                : false
+            })),
+            {
+              concurrent: verbose ? false : true,
+            },
+          )
+        }
+      ]),
+      enabled: () => template || defaultRun,
+    },
+    {
+      title: 'Set up new services',
+      task: () => new Listr([
+        {
+          title: 'Remove services folder',
+          task: () => resetEnvironment(cwd, 'services'),
+        },
+        {
+          title: 'Clone services from templates',
+          task: () => new Listr(
+            services.map(({ template, name }) => ({
+              title: name,
+              task: () => cloneService(cwd, template, name, verbose),
+            })),
+            {
+              concurrent: verbose ? false : true,
+            }
+          )
+        }
+      ]),
+      enabled: () => service || defaultRun,
+    },
+    {
+      title: 'Install yarn workspace',
+      task: () => installWorkspace(cwd, verbose),
+      enabled: () => install || defaultRun,
+    }
+  ],
+  {
+    renderer: verbose ? VerboseRenderer : UpdaterRenderer,
+    collapse: false,
+  });
 
-    templates.forEach(template => cloneTemplate(cwd, template, verbose));
-
-  }
-
-  // Setup service repositories
-  if (service || defaultRun) {
-
-    // Remove the services folder
-    resetEnvironment(cwd, 'services');
-
-    // Setup new services
-    services.forEach(({ name, template }) => {
-
-      // Clone from template
-      cloneService(cwd, template, name, verbose);
-
-      // Edit package.json#name. Unique package names are required by
-      // `yarn workspaces` to install the shared modules.
-      renamePackage(cwd, name);
-
-    });
-  }
-
-  // Install the yarn-workspace
-  if (install || defaultRun) {
-    installWorkspace(cwd, verbose);
-  }
-
-  LogTask.groupEnd('Completed workspace setup');
+  tasks.run().catch(err => { /* console.error */ });
 
 };

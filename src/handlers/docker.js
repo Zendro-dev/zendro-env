@@ -72,8 +72,8 @@ exports.destroyDockerEnv = async function (cwd, docker, verbose) {
 
   await command(`docker-compose -f ${docker} down ${flags}`, {
     cwd,
-    stdio: verbose ? 'inherit' : 'ignore',
-  });
+    stdio: verbose ? 'inherit' : 'pipe',
+  }).catch(error => { throw error; });
 
 };
 
@@ -89,8 +89,8 @@ exports.downContainers = async function (cwd, docker, verbose) {
 
   await command(`docker-compose -f ${docker} down ${flags}`, {
     cwd,
-    stdio: verbose ? 'inherit' : 'ignore',
-  });
+    stdio: verbose ? 'inherit' : 'pipe',
+  }).catch(error => { throw error; });
 };
 
 /**
@@ -106,7 +106,7 @@ exports.upContainers = async function (cwd, docker, verbose) {
 
   await command(`docker-compose -f ${docker} up ${flags}`, {
     cwd,
-    stdio: verbose ? 'inherit' : 'ignore'
-  });
+    stdio: verbose ? 'inherit' : 'pipe'
+  }).catch(error => { throw error; });
 
 };

@@ -1,10 +1,11 @@
-const { getConfig }  = require('../config/config');
-const { expandPath } = require('../config/helpers');
-const { LogTask }    = require('../debug/task-logger');
+const Listr           = require('listr');
+const VerboseRenderer = require('listr-verbose-renderer');
+const UpdaterRenderer = require('listr-update-renderer');
+const { getConfig }   = require('../config/config');
 const {
   applyPatches,
   generateCode,
-  getTemplateMain,
+  resetService,
 } = require('../handlers/codegen');
 
 
@@ -13,6 +14,11 @@ exports.command  = 'codegen';
 exports.describe = 'Generate code for a testing environment.';
 
 exports.builder  = {
+  clean: {
+    describe: 'Clean generated code and patches',
+    group: 'Codegen',
+    type: 'boolean',
+  },
   code: {
     describe: 'Generate code only',
     group: 'Codegen',
@@ -28,56 +34,76 @@ exports.builder  = {
 /**
  * Command execution handler.
  *
- * @typedef  {Object} CodegenOpts Codegen command options
- * @property {boolean} code    generate code only
- * @property {boolean} patch   apply patches only
- * @property {boolean} verbose global _verbose_ option
+ * @typedef  {Object}  CodegenOpts Codegen command options
+ * @property {boolean}       clean clean generated code and patches
+ * @property {boolean}        code generate code only
+ * @property {boolean}       patch apply patches only
+ * @property {boolean}     verbose global _verbose_ option
  *
  * @param {CodegenOpts} opts codegen command options
  */
 exports.handler = (opts) => {
 
   const { cwd, services, models, patches, templates } = getConfig();
-  const { code, patch, verbose } = opts;
+  const { clean, code, patch, verbose } = opts;
 
-  const defaultRun = !code && !patch;
+  const defaultRun = !clean && !code && !patch;
 
-  LogTask.verbose = verbose;
-  LogTask.groupBegin('Generating instances code');
+  const tasks = new Listr([
+    {
+      title: 'Reset service repository',
+      task: () => new Listr(
+        services.map(service => ({
+          title: service.name,
+          task: () => resetService(cwd, service, verbose),
+        })),
+        {
+          concurrent: verbose ? false : true,
+        }
+      ),
+      enabled: () => clean || code || defaultRun,
+    },
+    {
+      title: 'Generate code',
+      task: () => new Listr(
+        models.reduce((acc, model) => {
 
-  if (code || defaultRun) {
+          model.target.forEach(targetService => {
 
-    models.forEach(({ path, opts, target }) => {
+            const service = services.find(service => service.name === targetService);
+            const codegen = templates.find(({ name }) => name === service.codegen);
 
-      target.forEach(targetService => {
+            acc.push({
+              title: targetService,
+              task: () => generateCode(cwd, model, service, codegen, verbose),
+            });
 
-        const { codegen } = services.find(service => service.name === targetService);
-        const template    = templates.find(({ name }) => name === codegen);
+          });
 
-        // Path to the code-generator main .js file
-        const codegenMain = getTemplateMain(cwd, template);
+          return acc;
 
-        // Generate code using the appropriate generator.
-        generateCode(cwd, path, targetService, codegenMain, opts, verbose);
+        }, []),
+        {
+          concurrent: verbose ? false : true,
+        }
+      ),
+      enabled: () => code || defaultRun,
+    },
+    {
+      title: 'Apply patches',
+      task: () => new Listr(
+        patches.map(p => ({
+          title: p.src,
+          task: () => applyPatches(cwd, p, verbose),
+        }))
+      ),
+      enabled: () => patch || defaultRun,
+    }
+  ], {
+    renderer: verbose ? VerboseRenderer : UpdaterRenderer,
+    collapse: false,
+  });
 
-      });
-
-    });
-
-  }
-
-  if (patch || defaultRun) {
-
-    patches.forEach(patch => {
-
-      const dest = expandPath(patch.dest) ?? patch.dest;
-
-      applyPatches(cwd, patch.src, dest, patch.opts, verbose);
-
-    });
-
-  }
-
-  LogTask.groupEnd('Generated instances code');
+  tasks.run().catch(err => { /* console.error */ });
 
 };
