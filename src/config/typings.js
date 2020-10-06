@@ -7,6 +7,7 @@
  * @property {Patch[]}      patches codegen patches
  * @property {Template[]} templates repository templates
  * @property {Test[]}         tests test runners
+ * @property {Env}              env environment variables
 **/
 
 //
@@ -54,4 +55,10 @@
  * @property {string}   name test runner unique name
  * @property {string} runner test runner command
  * @property {string} target path to the tests file or config directory
+**/
+
+//
+
+/**
+ * @typedef  {Object<string,string|number|boolean>} Env Environment variables
 **/

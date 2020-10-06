@@ -11,7 +11,7 @@ const configPath = sync(['.testenv.json', '.testenvrc'], {
 });
 
 if (!configPath) throw new Error(
-  'To use the zendro-test CLI, a properly configured ".testenvrc" or' +
+  'To use the zendro-env CLI, a properly configured ".testenvrc" or' +
   ' ".testenv.json" file is required in the project folder'
 );
 
@@ -19,6 +19,12 @@ if (!configPath) throw new Error(
 const config = JSON.parse(
   readFileSync(configPath, { encoding: 'utf-8'})
 );
+
+// update ENV
+process.env = {
+  ...process.env,
+  ...config.env,
+};
 
 
 /**

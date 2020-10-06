@@ -1,8 +1,28 @@
-const { command }                                     = require('execa');
-const { copyFile, readFile, mkdir, rmdir, writeFile } = require('fs/promises');
-const { join, resolve }                               = require('path');
-const { Observable }                                  = require('rxjs');
+const { command }                                           = require('execa');
+const { copyFile, readFile, mkdir, rmdir, stat, writeFile } = require('fs/promises');
+const { join, resolve }                                     = require('path');
+const { Observable }                                        = require('rxjs');
 
+
+/**
+ * Check workspace folder integrity.
+ * @param {string}        cwd path to working directory
+ * @param {string} folderName subfolder to check
+ */
+exports.checkWorkspace = async function (cwd, folderName) {
+
+  let exists = true;
+  const path = folderName ? join(cwd, folderName) : cwd;
+
+  await stat(path).catch(error => {
+    if (error.code === 'ENOENT')
+      exists = false;
+    else
+      throw error;
+  });
+
+  return exists;
+};
 
 /**
  * Clone Zendro repository templates required to install the workspace.
@@ -109,10 +129,6 @@ exports.installWorkspace = async function (cwd, verbose) {
       observer.next('Installing node modules');
       await command('yarn install', {
         cwd,
-        env: {
-          ...process.env,
-          NODE_JQ_SKIP_INSTALL_BINARY: true
-        },
         stdio: verbose ? 'inherit' : 'pipe'
       });
 
@@ -130,10 +146,11 @@ exports.installWorkspace = async function (cwd, verbose) {
 /**
  * Fully or partially reset the testing environment.
  *
- * WARNING: The worspace folder, or the given subfolder name, will be removed and recreated anew.
+ * WARNING: The worspace folder or the given subfolder contents will be lost.
  *
  * @param {string}         cwd path to working directory
- * @param {string?} folderName workspace folder to reset
+ * @param {string?} folderName workspace subfolder to reset
+ * @param {boolean}   recreate recreate as empty folder
  */
 exports.resetEnvironment = async function (cwd, folderName, recreate = true) {
 

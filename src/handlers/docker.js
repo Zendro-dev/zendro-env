@@ -66,7 +66,7 @@ exports.checkDockerEnv = async function (service, maxConnectionAttempts = 10) {
  * @param {string}   docker path to docker-compose.yml file
  * @param {boolean} verbose global _verbose_ option
  */
-exports.destroyDockerEnv = async function (cwd, docker, verbose) {
+exports.deleteDockerEnv = async function (cwd, docker, verbose) {
 
   const flags = '-v --rmi all';
 

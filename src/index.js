@@ -1,5 +1,4 @@
-const yargs = require('yargs');
-//
+const yargs           = require('yargs');
 const { checkConfig } = require('./config/config');
 
 
@@ -18,18 +17,18 @@ const globalOpts = {
 
 // Declare use message
 const usage = `
-Zendro integration-tests environment manager utility.
+Zendro testing-environment manager utility.
 
 USAGE:
 
   # To execute a default integration-test run
-  $ ./zendro-test
+  $ ./zendro-env [options...]
 
   # To exert control over each step in the setup process
-  $ ./zendro-test <command>
+  $ ./zendro-env <command>
 
   # To get specific help for a command
-  $ ./zendro-test <command> --help
+  $ ./zendro-env <command> --help
 `;
 
 // Parse command-line

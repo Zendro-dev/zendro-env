@@ -1,15 +1,29 @@
 const Listr           = require('listr');
 const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
+
 const { getConfig }   = require('../config/config');
 const {
+  checkWorkspace,
   cloneTemplate,
   cloneService,
   installWorkspace,
   resetEnvironment,
 } = require('../handlers/setup');
 
+
 /* TASKS */
+
+/**
+ * Create a workspace folder if it does not exist.
+ * @param {string} title task title
+ * @param {string}   cwd path to working directory
+ */
+const createWorkspace = (title, cwd) => ({
+  title,
+  task: () => resetEnvironment(cwd, null, true),
+  skip: async () => await checkWorkspace(cwd) ? 'Workspace folder exists' : false,
+});
 
 /**
  * Re-generate upstream templates.
@@ -23,11 +37,12 @@ const setupTemplates = (title, cwd, templates, verbose, enabled) => ({
   title,
   task: () => new Listr([
     {
-      title: 'Remove templates folder',
+      title: 'Remove existing templates',
       task: () => resetEnvironment(cwd, 'templates'),
+      skip: async () => await checkWorkspace(cwd, 'templates') ? false : 'No templates to remove',
     },
     {
-      title: 'Clone templates from upstream',
+      title: 'Clone templates',
       task: () => new Listr(
         templates.map(template => ({
           title: template.name,
@@ -57,8 +72,9 @@ const setupServices = (title, cwd, services, verbose, enabled) => ({
   title,
   task: () => new Listr([
     {
-      title: 'Remove services folder',
+      title: 'Remove existing services',
       task: () => resetEnvironment(cwd, 'services'),
+      skip: async () => await checkWorkspace(cwd, 'services') ? false : 'No services to remove',
     },
     {
       title: 'Clone services from templates',
@@ -114,6 +130,7 @@ exports.builder = {
 };
 
 exports.setupTasks = {
+  createWorkspace,
   setupModules,
   setupServices,
   setupTemplates,
@@ -138,6 +155,10 @@ exports.handler = (opts) => {
   const defaultRun = !install && !service && !template;
 
   const tasks = new Listr([
+    createWorkspace(
+      'Create workspace',
+      cwd,
+    ),
     setupTemplates(
       'Set up templates',
       cwd, templates, verbose,

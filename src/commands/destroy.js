@@ -3,16 +3,39 @@ const VerboseRenderer      = require('listr-verbose-renderer');
 const UpdaterRenderer      = require('listr-update-renderer');
 const { getConfig }        = require('../config/config');
 const { resetEnvironment } = require('../handlers/setup');
-const { destroyDockerEnv } = require('../handlers/docker');
+const { deleteDockerEnv }  = require('../handlers/docker');
 
 
 /* TASKS */
 
-const destroyDocker = (title, cwd, docker, verbose, enabled) => ({
+/**
+ * Destroy containers, images, and volumes.
+ * @param {string}          title task title
+ * @param {string}            cwd path to working directory
+ * @param {string}         docker path to docker-compose file
+ * @param {boolean}       verbose global _verbose_option
+ * @param {() => boolean} enabled whether the task is enabled
+ */
+const destroyDockerEnv = (title, cwd, docker, verbose, enabled) => ({
   title,
-  task: () => destroyDockerEnv(cwd, docker, verbose),
+  task: () => deleteDockerEnv(cwd, docker, verbose),
   enabled,
 });
+
+
+/**
+ * Fully or partially destroy the working environment.
+ * @param {string}             title task title
+ * @param {string}               cwd path to working directory
+ * @param {string}        folderName workspace subfolder
+ * @param {() => boolean}    enabled whether the task is enabled
+ */
+const destroyWorkEnv = (title, cwd, folderName, enabled) => ({
+  title,
+  task: () => resetEnvironment(cwd, folderName, false),
+  enabled,
+});
+
 
 /* COMMAND */
 
@@ -44,7 +67,8 @@ exports.builder = {
 };
 
 exports.destroyTasks = {
-  destroyDocker,
+  destroyDockerEnv,
+  destroyWorkEnv,
 };
 
 /**
@@ -67,26 +91,26 @@ exports.handler = (opts) => {
   const defaultRun = !compose && !service && !template;
 
   const tasks = new Listr([
-    {
-      title: 'Remove docker containers, images, and volumes',
-      task: () => destroyDockerEnv(cwd, docker, verbose),
-      enabled: () => compose || defaultRun,
-    },
-    {
-      title: 'Remove services',
-      task: () => resetEnvironment(cwd, 'services', false),
-      enabled: () => service || defaultRun,
-    },
-    {
-      title: 'Remove templates',
-      task: () => resetEnvironment(cwd, 'templates', false),
-      enabled: () => template || defaultRun,
-    },
-    {
-      title: 'Remove node modules',
-      task: () => resetEnvironment(cwd, 'node_modules', false),
-      enabled: () => modules || defaultRun,
-    }
+    destroyDockerEnv(
+      'Remove docker containers, images, and volumes',
+      cwd, docker, verbose,
+      () => compose || defaultRun,
+    ),
+    destroyWorkEnv(
+      'Remove services',
+      cwd, 'services',
+      () => service || defaultRun
+    ),
+    destroyWorkEnv(
+      'Remove templates',
+      cwd, 'templates',
+      () => template || defaultRun
+    ),
+    destroyWorkEnv(
+      'Remove node modules',
+      cwd, 'node_modules',
+      () => modules || defaultRun
+    ),
   ], {
     collapse: false,
     concurrent: verbose ? false : true,

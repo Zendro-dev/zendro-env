@@ -3,8 +3,6 @@ const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
 
 const { getConfig }        = require('../config/config');
-const { resetEnvironment } = require('../handlers/setup');
-const { downContainers }   = require('../handlers/docker');
 
 const { destroyTasks } = require('./destroy');
 const { dockerTasks }  = require('./docker');
@@ -94,105 +92,49 @@ exports.handler = async (opts) => {
    */
   const defaultRun = !opts.c && !opts.C && !opts.g && !opts.t && !opts.T;
 
-  const tasks = new Listr([
-    // default: setup the environment and run tests
-    {
-      title: 'Default testing run',
-      task: () => new Listr([
-        setupTasks.setupTemplates(
-          'Clone upstream templates',
-          cwd, templates, opts.v,
-        ),
-        setupTasks.setupServices(
-          'Clone services from templates',
-          cwd, services, opts.v,
-        ),
-        setupTasks.setupModules(
-          'Install yarn workspace',
-          cwd, opts.v,
-        ),
-        codegenTasks.resetServices(
-          'Reset service repositories',
-          cwd, services, opts.v,
-        ),
-        codegenTasks.generateServices(
-          'Generate code',
-          cwd, models, services, templates, opts.v,
-        ),
-        codegenTasks.applyPatches(
-          'Apply patches',
-          cwd, patches, opts.v,
-        ),
-        dockerTasks.upDockerContainers(
-          'Start docker containers, renew volumes, and remove orphans',
-          cwd, docker, opts.v,
-        ),
-        dockerTasks.checkDockerServiceConnections(
-          'Check service connections',
-          services, opts.v,
-        ),
-      ]),
-      enabled: () => defaultRun,
-    },
-
-    // -c, --cleanup
-    {
-      title: 'Clean up testing environment',
-      task: () => new Listr([
-        destroyTasks.destroyDocker(
-          'Remove docker environment',
-          cwd, docker, opts.v,
-        ),
-        {
-          title: 'Remove work environment',
-          task: () => resetEnvironment(cwd, null, false),
-        },
-      ]),
-      enabled: () => opts.c,
-    },
-
-    // -C, --soft-cleanup
-    {
-      title: 'Reset testing environment',
-      task: () => new Listr([
-        dockerTasks.downDockerContainers(
-          'Stop services, remove containers and volumes',
-          cwd, docker, opts.v
-        ),
-        codegenTasks.resetServices(
-          'Remove generated code',
-          cwd, services, opts.v,
-        ),
-      ]),
-      enabled: () => opts.C
-    },
-
-    // -g, --generate-code || -T, --generate-code-and-run-tests
-    {
-      title: 'Re-generate code and patches',
-      task: () => new Listr([
-        codegenTasks.resetServices(
-          'Reset service repositories',
-          cwd, services, opts.v,
-        ),
-        codegenTasks.generateServices(
-          'Generate code',
-          cwd, models, services, templates, opts.v,
-        ),
-        codegenTasks.applyPatches(
-          'Apply patches',
-          cwd, patches, opts.v,
-        ),
-      ]),
-      enabled: () => opts.g || opts.T
-    },
-
-  ], {
+  const tasks = new Listr({
     renderer: opts.v ? VerboseRenderer : UpdaterRenderer,
     collapse: false,
   });
 
-  await tasks.run().catch(err => { /* console.error */ });
+  if (defaultRun) tasks.add([
+
+    setupTasks.createWorkspace('Create workspace', cwd),
+    setupTasks.setupTemplates('Set up templates', cwd, templates, opts.v),
+    setupTasks.setupServices('Set up service instances', cwd, services, opts.v),
+    setupTasks.setupModules('Install yarn workspace', cwd, opts.v),
+
+    codegenTasks.resetServices('Clean generated code and patches', cwd, services, opts.v),
+    codegenTasks.generateServices('Generate code', cwd, models, services, templates, opts.v),
+    codegenTasks.applyPatches('Apply patches', cwd, patches, opts.v),
+
+    dockerTasks.upDockerContainers('Start docker containers', cwd, docker, opts.v),
+    dockerTasks.checkDockerServiceConnections('Check service connections', services, opts.v),
+
+  ]);
+
+  if (opts.c) tasks.add([
+    destroyTasks.destroyDockerEnv('Remove docker environment', cwd, docker, opts.v),
+    destroyTasks.destroyWorkEnv('Remove work environment', cwd, null),
+  ]);
+
+  if (opts.C) tasks.add([
+    dockerTasks.downDockerContainers('Stop docker containers', cwd, docker, opts.v),
+    codegenTasks.resetServices('Remove generated code', cwd, services, opts.v),
+  ]);
+
+  if (opts.g || opts.T) tasks.add([
+
+    codegenTasks.resetServices('Clean generated code and patches', cwd, services, opts.v),
+    codegenTasks.generateServices('Generate code', cwd, models, services, templates, opts.v),
+    codegenTasks.applyPatches('Apply patches', cwd, patches, opts.v),
+
+  ]);
+
+  await tasks.run().catch(error => {
+    console.log(error);
+    process.exit(error.errno);
+  });
 
   // -t, --run-tests-only || -T, --generate-code-and-run-tests
   if (opts.t || opts.T || defaultRun)
@@ -200,5 +142,6 @@ exports.handler = async (opts) => {
 
   // default && _not_ -k, keep-running
   if (defaultRun && !opts.k)
-    await downContainers(cwd, docker, true);
+    await dockerTasks.downDockerContainers('', cwd, docker, true).task();
+
 };
