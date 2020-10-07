@@ -118,10 +118,14 @@ exports.handler = async (opts) => {
 
   if (opts.g || opts.T) tasks.add([
 
-    codegenTasks.resetServices('Clean generated code and patches', cwd, services, opts.v),
+    codegenTasks.resetServices('Remove generated code', cwd, services, opts.v),
     codegenTasks.generateServices('Generate code', cwd, models, services, templates, opts.v),
     codegenTasks.applyPatches('Apply patches', cwd, patches, opts.v),
 
+  ]);
+
+  if (opts.T) tasks.add([
+    dockerTasks.checkDockerServiceConnections('Check service connections', services, opts.v),
   ]);
 
   await tasks.run().catch(error => {
