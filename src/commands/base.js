@@ -25,7 +25,7 @@ exports.builder = {
   },
   C: {
     alias: 'soft-cleanup',
-    describe: 'Reset docker-compose and delete generated code',
+    describe: 'Remove docker containers and generated code',
     group: 'Default',
     type: 'boolean',
     conflicts: [ 'b', 'c', 'g', 'k', 't', 'T' ],
