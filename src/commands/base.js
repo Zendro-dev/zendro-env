@@ -13,7 +13,7 @@ const { testTasks }    = require('./test');
 
 exports.command = '* [testNames...]';
 
-exports.describe = 'Default run to create a full environment and run tests';
+exports.describe = 'Create a full environment and run tests';
 
 exports.builder = {
   c: {

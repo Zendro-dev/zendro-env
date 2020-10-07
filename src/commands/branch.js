@@ -106,10 +106,7 @@ const updateTemplateDependencies = (title, name, verbose) => {
 
 exports.command = 'branch <name> <remote> <branch>';
 
-exports.describe = `Checkout a template and all of its services to a target repository branch.
-                    -   name: template in the config file
-                    - remote: upstream remote (usually "origin")
-                    - branch: target branch to checkout into`;
+exports.describe = 'Checkout a new repository branch.';
 
 exports.builder = {};
 
