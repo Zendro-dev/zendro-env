@@ -24,7 +24,8 @@ const checkDockerServiceConnections = (title, services, verbose, enabled) => ({
     services.map(server => ({
 
       title: `${server.name}`,
-      task: () => checkDockerEnv(server)
+      task: () => checkDockerEnv(server),
+      skip: () => server.url ? false : 'Service does not have a configured URL'
 
     })),
     {
