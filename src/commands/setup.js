@@ -52,7 +52,7 @@ const setupTemplates = (title, cwd, templates, verbose, enabled) => ({
             : false
         })),
         {
-          concurrent: verbose ? false : true,
+          concurrent: !verbose,
         },
       )
     }
@@ -84,7 +84,7 @@ const setupServices = (title, cwd, services, verbose, enabled) => ({
           task: () => cloneService(cwd, template, name, verbose),
         })),
         {
-          concurrent: verbose ? false : true,
+          concurrent: !verbose,
         }
       )
     }

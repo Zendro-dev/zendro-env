@@ -18,21 +18,13 @@ exports.checkDockerEnv = async function (service, maxConnectionAttempts = 10) {
 
     const { name, url } = service;
 
-    // Fetch users from the graphql-server
-    // TODO: adapt "connect" for the SPA service
-    const connect = () => fetch(url, {
-      method: 'POST',
-      body: JSON.stringify({ query: '{ users (pagination: { limit: 1 }) { id } }' }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-
     // Attempt to fetch from the service
     observer.next(`Connecting to ${name}`);
     let response;
     let attempts = 0;
     while (!response && attempts <= maxConnectionAttempts) {
       try {
-        response = await connect();
+        response = await fetch(url);
       }
       catch (error) {
         attempts++;
@@ -46,9 +38,6 @@ exports.checkDockerEnv = async function (service, maxConnectionAttempts = 10) {
     // Complete the observer
     if (!response) {
       observer.error(new Error(`Connection to "${name}" @ ${url} failed`));
-    }
-    else if (!response.ok) {
-      observer.next(`Service ${name} responded with errors`);
     }
     else {
       observer.next(`Connected to ${name} @ ${url}`);

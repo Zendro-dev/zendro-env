@@ -16,13 +16,6 @@ exports.command = '* [testNames...]';
 exports.describe = 'Default run to create a full environment and run tests';
 
 exports.builder = {
-  // b: {
-  //   alias: 'branch',
-  //   describe: 'Checkout all services to a different feature branch',
-  //   group: 'Default',
-  //   requiresArg: true,
-  //   type: 'string',
-  // },
   c: {
     alias: 'cleanup',
     describe: 'Remove the full testing environment',

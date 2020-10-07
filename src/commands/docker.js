@@ -28,7 +28,7 @@ const checkDockerServiceConnections = (title, services, verbose, enabled) => ({
 
     })),
     {
-      concurrent: verbose ? false : true,
+      concurrent: true,
       exitOnError: false,
     }
   ),

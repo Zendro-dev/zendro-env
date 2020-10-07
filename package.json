@@ -1,6 +1,6 @@
 {
   "name": "zendro-env",
-  "version": "0.5.0",
+  "version": "0.6.1",
   "description": "Zendro tooling to setup and manage a testing environment",
   "bin": {
     "zendro-env": "./bin/zendro-env"
@@ -17,7 +17,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "chalk": "^4.1.0",
     "execa": "^4.0.3",
     "find-up": "^5.0.0",
     "listr": "^0.14.3",

@@ -113,7 +113,7 @@ exports.handler = (opts) => {
     ),
   ], {
     collapse: false,
-    concurrent: verbose ? false : true,
+    concurrent: !verbose,
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
   });
 

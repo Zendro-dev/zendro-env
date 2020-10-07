@@ -25,7 +25,7 @@ exports.applyPatch = async function (cwd, patch, verbose) {
     .join(' ');
 
   // Expand destination path, if needed
-  const dest = expandPath(patch.dest) ?? patch.dest;
+  const dest = expandPath(patch.dest) || patch.dest;
 
   await command(`patch ${resolvedArgs} ${dest} ${patch.src}`, {
     cwd,

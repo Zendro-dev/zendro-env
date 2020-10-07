@@ -30,7 +30,7 @@ const resetServices = (title, cwd, services, verbose, enabled) => ({
         }),
     })),
     {
-      concurrent: verbose ? false : true,
+      concurrent: !verbose,
     }
   ),
 
@@ -70,7 +70,7 @@ const generateServices = (title, cwd, models, services, templates, verbose, enab
 
     }, []),
     {
-      concurrent: verbose ? false : true,
+      concurrent: !verbose,
     }
   ),
 

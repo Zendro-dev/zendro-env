@@ -144,19 +144,19 @@ exports.installWorkspace = async function (cwd, verbose) {
 };
 
 /**
- * Fully or partially reset the testing environment.
+ * Destroy and optionally recreate any folder, including root, of the work environment.
  *
- * WARNING: The worspace folder or the given subfolder contents will be lost.
+ * WARNING: The worspace folder or the given subfolder path contents will be lost.
  *
  * @param {string}         cwd path to working directory
- * @param {string?} folderName workspace subfolder to reset
+ * @param {string?} folderPath path to a workspace subfolder
  * @param {boolean}   recreate recreate as empty folder
  */
-exports.resetEnvironment = async function (cwd, folderName, recreate = true) {
+exports.resetEnvironment = async function (cwd, folderPath, recreate = true) {
 
   return new Observable(async observer => {
 
-    const pathToReset = folderName ? join(cwd, folderName) : cwd;
+    const pathToReset = folderPath ? join(cwd, folderPath) : cwd;
 
     try {
       observer.next(`Removing ${pathToReset}`);
