@@ -66,7 +66,7 @@ exports.cloneService = async function (cwd, template, name, verbose) {
 
   return new Observable(async observer => {
 
-    const src = `./templates/${template}/.git`;
+    const src = resolve(cwd, template);
     const dest = `services/${name}`;
 
     observer.next(`cloning ${src}`);

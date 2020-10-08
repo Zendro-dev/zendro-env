@@ -2,7 +2,8 @@ const Listr           = require('listr');
 const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
 
-const { getConfig }   = require('../config/config');
+const { getConfig }  = require('../config/config');
+const { expandPath } = require('../config/helpers');
 const {
   checkWorkspace,
   cloneTemplate,
@@ -81,7 +82,7 @@ const setupServices = (title, cwd, services, verbose, enabled) => ({
       task: () => new Listr(
         services.map(({ template, name }) => ({
           title: name,
-          task: () => cloneService(cwd, template, name, verbose),
+          task: () => cloneService(cwd, expandPath(template), name, verbose),
         })),
         {
           concurrent: !verbose,
