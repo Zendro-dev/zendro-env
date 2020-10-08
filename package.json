@@ -1,6 +1,6 @@
 {
   "name": "zendro-env",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Zendro tooling to setup and manage a testing environment",
   "bin": {
     "zendro-env": "./bin/zendro-env"
