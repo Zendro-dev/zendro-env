@@ -111,20 +111,20 @@ exports.handler = async (opts) => {
     destroyTasks.destroyWorkEnv('Remove work environment', cwd, null),
   ]);
 
-  if (opts.C) tasks.add([
+  if (opts.C || opts.g || opts.T) tasks.add([
     dockerTasks.downDockerContainers('Stop docker containers', cwd, docker, opts.v),
     codegenTasks.resetServices('Remove generated code', cwd, services, opts.v),
   ]);
 
   if (opts.g || opts.T) tasks.add([
 
-    codegenTasks.resetServices('Remove generated code', cwd, services, opts.v),
     codegenTasks.generateServices('Generate code', cwd, models, services, templates, opts.v),
     codegenTasks.applyPatches('Apply patches', cwd, patches, opts.v),
 
   ]);
 
   if (opts.T) tasks.add([
+    dockerTasks.upDockerContainers('Start docker containers', cwd, docker, opts.v),
     dockerTasks.checkDockerServiceConnections('Check service connections', services, opts.v),
   ]);
 
