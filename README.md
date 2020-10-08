@@ -14,7 +14,11 @@ This tool can be used to create an arbitrary number of Zendro `graphql-server` a
 
 The tool can be installed via `npm` globally, as a `package.json` dependency, or cloned locally. It requires `yarn`, a properly configured `.testenvrc` file, and `node >= 12.x`.
 
-It can be operated in either `default` or `command` mode.
+It can be operated in either [`default`](#default) or [`command`](#commands) mode.
+
+### Output & Concurrency
+
+The tool will output progress and error messages using a simplified `task` view. In this view certain tasks will run concurrently whenever possible. This output can be made more `verbose` using the `-v` option in the command-line interface, but concurrency will be disabled for the majority of the commands.
 
 ### Help
 
@@ -30,7 +34,7 @@ zendro-env <command> --help
 
 ### Default
 
-In `default` mode, the tool will setup the configured environment `templates` and `services`, install a shared `node_modules` folder (using `yarn workspaces`), run `code generators`, apply `patches`, initialize and mount `docker` containers and volumes, and finally run all `tests` or only those specified by their names.
+In `default` mode (no specified command), the tool will setup the configured environment `templates` and `services`, install a shared `node_modules` folder (using `yarn workspaces`), run `code generators`, apply `patches`, initialize and mount `docker` containers and volumes, and finally run all `tests` or only those specified by their names.
 
 ```sh
 zendro-env [testNames...] [options]
@@ -46,7 +50,7 @@ Options:
 
 Some options will short-circuit the `default` command steps, running only the parts that are relevant to the specified option(s).
 
-Some options are complementary and will run in the appropriate order. When two options are not compatible, the command-line interface will exit and print the conflict.
+Options that are complementary will run in the appropriate order. When two options are not compatible, the command-line interface will exit and print the conflict.
 
 #### Examples
 
@@ -101,30 +105,43 @@ zendro-env docker --check
 zendro-env docker --down
 ```
 
+
 ## Configuration
 
 This tool requires a configuration file named either `.testenv.json` or `.testenvrc`. The file should be located in the current working directory, but it will also be found if placed in a parent folder.
 
 ### `.testenv.json`
 
-This config file is necessary to create the dynamic environment and it is divided in several sections or entries: `cwd`, `docker`, `services`, `models`, `patches`, `templates`, `tests`, and `env`.
+This config file is necessary to create the dynamic environment and it is divided in several sections or entries: `cwd`, `env`, `docker`, `services`, `models`, `patches`, `templates`, and `tests`.
 
 entry       | type          | mandatory | description
 ---         | ---           | :---:     | ---
 `cwd`       | `string`      | YES       | path to the environment working directory
+`env`       | `Env`         | YES       | [`environment`](#env) variables
 `docker`    | `string`      | YES       | path to the `docker-compose` file
 `services`  | `Service[]`   | YES       | [`Service`](#services) definitions
 `models`    | `Model[]`     | YES       | [`Model`](#models) definitions
 `patches`   | `Patch[]`     | YES       | [`Patch`](#patches) definitions
 `templates` | `Template[]`  | YES       | [`Template`](#templates) definitions
 `tests`     | `Test[]`      | YES       | [`Test`](#tests) definitions
-`env`       | `string`      | YES       | environment variables
 
 ### `cwd`
 
 This path is used as an absolute reference for any other paths specified in the file. When using relative paths in any of the other sections, these should be relative to the `cwd` value.
 
 Note that when referencing the path of a [`service`](#services) or [`template`](#templates), for example for [`code generation`](#models) or [`patching`](#patches), their `name` identifier will be automatically expanded to the correct file system location.
+
+### `env`
+
+During the execution of some commands, it might be useful to set an environment variable to control parts of its behavior. Setting the variable in this section will make it available to any commands that can use it.
+
+The value of `env` is an object with any number of key-value pairs, where `key` is the environment variable name, and its `value` is the variable value.
+
+```ts
+interface Env {
+  [key: string]: string | number | boolean
+}
+```
 
 ### `docker`
 
