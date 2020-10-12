@@ -82,7 +82,7 @@ const setupServices = (title, cwd, services, verbose, enabled) => ({
       task: () => new Listr(
         services.map(({ template, name }) => ({
           title: name,
-          task: () => cloneService(cwd, expandPath(template), name, verbose),
+          task: () => cloneService(cwd, expandPath(template), expandPath(name), verbose),
         })),
         {
           concurrent: !verbose,

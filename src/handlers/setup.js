@@ -1,6 +1,6 @@
 const { command }                                           = require('execa');
 const { copyFile, readFile, mkdir, rmdir, stat, writeFile } = require('fs/promises');
-const { join, resolve }                                     = require('path');
+const { join, parse, resolve }                                     = require('path');
 const { Observable }                                        = require('rxjs');
 
 
@@ -57,53 +57,52 @@ exports.cloneTemplate = async function (cwd, template, verbose) {
 
 /**
  * Clone a new environment service.
- * @param {string}       cwd path to workspace folder
- * @param {string}  template template to clone from
- * @param {string}      name unique name of the service
- * @param {boolean}  verbose global verbose option
+ * @param {string}           cwd path to workspace folder
+ * @param {string}  templatePath relative path to template from cwd
+ * @param {string}   servicePath relative path to service from cwd
+ * @param {boolean}      verbose global verbose option
  */
-exports.cloneService = async function (cwd, template, name, verbose) {
+exports.cloneService = async function (cwd, templatePath, servicePath, verbose) {
 
   return new Observable(async observer => {
 
-    const src = resolve(cwd, template);
-    const dest = `services/${name}`;
-
-    observer.next(`cloning ${src}`);
+    observer.next(`cloning ${templatePath}`);
 
     try {
-      await command(`git clone ${src} ${dest}`, {
+      await command(`git clone ${templatePath} ${servicePath}`, {
         cwd,
         stdio: verbose ? 'inherit' : 'pipe'
       });
+
+      /**
+       * Edit package.json#name. Unique package names are required by
+       * yarn workspaces to install the shared modules.
+       */
+
+      // Read package.json
+      const packageJsonPath = `${resolve(cwd, servicePath)}/package.json`;
+      observer.next(`reading ${packageJsonPath}`);
+
+      const jsonString = await readFile(packageJsonPath, {
+        encoding: 'utf-8',
+      });
+      const packageJson = JSON.parse(jsonString);
+
+      // Edit package.json#name
+      const packageName = parse(servicePath).name;
+      observer.next(`renaming ${packageJson.name} -> ${packageName}`);
+      packageJson.name = packageName;
+      await writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2), {
+        encoding: 'utf-8'
+      });
+
     }
     catch (err) {
       if (verbose) {
         observer.next(err.message);
       }
-      observer.error(new Error(`Failed cloning ${src}`));
+      observer.error(err);
     }
-
-    /**
-     * Edit package.json#name. Unique package names are required by
-     * yarn workspaces to install the shared modules.
-     */
-
-    // Read package.json
-    const packageJsonPath = `${cwd}/services/${name}/package.json`;
-    observer.next(`reading ${packageJsonPath}`);
-
-    const jsonString = await readFile(packageJsonPath, {
-      encoding: 'utf-8'
-    });
-    const packageJson = JSON.parse(jsonString);
-
-    // Edit package.json#name
-    observer.next(`renaming ${packageJson.name} -> ${name}`);
-    packageJson.name = name;
-    await writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2), {
-      encoding: 'utf-8'
-    });
 
     observer.complete();
 
