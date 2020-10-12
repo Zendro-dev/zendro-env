@@ -55,6 +55,7 @@ const updateTemplateDependencies = (title, name, verbose) => {
 
   // Matching template definition
   const template = config.templates.find(template => template.name === name);
+  const templateCwdPath = expandPath(template.name);
 
   // Associated services
   const services = config.services.filter(service => service.template === name);
@@ -72,24 +73,24 @@ const updateTemplateDependencies = (title, name, verbose) => {
     task: () => new Listr(
       services.map(service => {
 
-        const serviceRelativePath = expandPath(service.name);
+        const serviceCwdPath = expandPath(service.name);
 
         return {
 
           title: `${service.name}`,
 
-          skip: async () => await checkWorkspace(cwd, serviceRelativePath)
+          skip: async () => await checkWorkspace(cwd, serviceCwdPath)
             ? false
             : 'Service is not installed',
 
           task: () => new Listr([
             {
               title: 'Remove existing service',
-              task: () => resetEnvironment(cwd, serviceRelativePath),
+              task: () => resetEnvironment(cwd, serviceCwdPath),
             },
             {
               title: 'Clone service',
-              task: () => cloneService(cwd, template.name, service.name, verbose)
+              task: () => cloneService(cwd, templateCwdPath, serviceCwdPath, verbose)
             },
           ]),
 
