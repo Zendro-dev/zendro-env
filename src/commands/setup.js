@@ -1,14 +1,18 @@
 const Listr           = require('listr');
 const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
+const { Observable }  = require('rxjs');
 
-const { getConfig }  = require('../config/config');
-const { expandPath } = require('../config/helpers');
+const { getConfig } = require('../config/config');
 const {
   checkWorkspace,
+  expandPath
+} = require('../config/helpers');
+const {
   cloneTemplate,
   cloneService,
-  installWorkspace,
+  installModules,
+  renamePackageJson,
   resetEnvironment,
 } = require('../handlers/setup');
 
@@ -23,75 +27,131 @@ const {
 const createWorkspace = (title, cwd) => ({
   title,
   task: () => resetEnvironment(cwd, null, true),
-  skip: async () => await checkWorkspace(cwd) ? 'Workspace folder exists' : false,
 });
+
+/**
+ * Destroy any folder within the workspace. If the `folderPath` argument is not
+ * specified, the entire workspace will be destroyed.
+ * @param {string}       title task title
+ * @param {string?} folderPath path to workspace folder
+ */
+const resetWorkspace = (title, folderPath, verbose) => {
+
+  const { cwd } = getConfig();
+
+  return {
+    title,
+    task: () => new Observable(async observer => {
+
+      try {
+        observer.next(`Removing ${folderPath}`);
+        await resetEnvironment(cwd, folderPath);
+      }
+      catch (error) {
+        if (verbose)
+          observer.next(error.message);
+        observer.error(error);
+      }
+
+      observer.complete();
+    })
+  };
+};
 
 /**
  * Re-generate upstream templates.
- * @param {string}         title task title
- * @param {string}           cwd path to working directory
- * @param {Template[]} templates list of templates
- * @param {boolean}      verbose global _verbose_ option
- * @param {()=>boolean}  enabled task enabler
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_ option
  */
-const setupTemplates = (title, cwd, templates, verbose, enabled) => ({
-  title,
-  task: () => new Listr([
-    {
-      title: 'Remove existing templates',
-      task: () => resetEnvironment(cwd, 'templates'),
-      skip: async () => await checkWorkspace(cwd, 'templates') ? false : 'No templates to remove',
-    },
-    {
-      title: 'Clone templates',
-      task: () => new Listr(
-        templates.map(template => ({
-          title: template.name,
-          task: () => cloneTemplate(cwd, template, verbose),
-          skip: () => template.source
-            ? `Using ${template.name} as source.`
+const setupTemplates = (title, verbose) => {
+
+  const { cwd, templates } = getConfig();
+
+  return {
+    title,
+    task: () => new Listr(
+      templates.map(template => {
+
+        const { branch, name, source, url } = template;
+        const dest = expandPath(name);
+
+        return {
+
+          title: name,
+
+          task: () => new Observable(async observer => {
+
+            observer.next(`cloning ${url}`);
+
+            try {
+              await cloneTemplate(cwd, branch, url, dest, verbose);
+            }
+            catch (error) {
+              if (verbose)
+                observer.next(error.message);
+              observer.error(error);
+            }
+
+            observer.complete();
+          }),
+
+          skip: () => source
+            ? `Using ${name} as source.`
             : false
-        })),
-        {
-          concurrent: !verbose,
-        },
-      )
-    }
-  ]),
-  enabled,
-});
+
+        };
+      }), {
+        concurrent: !verbose,
+      },
+    )
+  };
+};
 
 /**
  * Re-create services.
- * @param {string}        title task title
- * @param {string}          cwd path to working directory
- * @param {Service[]}  services list of services
- * @param {boolean}     verbose global _verbose_ option
- * @param {()=>boolean} enabled task enabler
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_ option
  */
-const setupServices = (title, cwd, services, verbose, enabled) => ({
-  title,
-  task: () => new Listr([
-    {
-      title: 'Remove existing services',
-      task: () => resetEnvironment(cwd, 'services'),
-      skip: async () => await checkWorkspace(cwd, 'services') ? false : 'No services to remove',
-    },
-    {
-      title: 'Clone services from templates',
-      task: () => new Listr(
-        services.map(({ template, name }) => ({
+const setupServices = (title, verbose) => {
+
+  const { cwd, services } = getConfig();
+
+  return {
+    title,
+    task: () => new Listr(
+      services.map(({ template, name }) => {
+
+        const templatePath = expandPath(template);
+        const servicePath  = expandPath(name);
+
+        return {
           title: name,
-          task: () => cloneService(cwd, expandPath(template), expandPath(name), verbose),
-        })),
-        {
-          concurrent: !verbose,
-        }
-      )
-    }
-  ]),
-  enabled,
-});
+          task: () => new Observable(async observer => {
+
+            try {
+
+              observer.next(`cloning ${templatePath}`);
+              await cloneService(cwd, templatePath, servicePath);
+
+              observer.next(`renaming ${servicePath} package.json`);
+              await renamePackageJson(cwd, servicePath);
+            }
+            catch (error) {
+              if (verbose)
+                observer.next(error.message);
+              observer.error(error);
+            }
+
+            observer.complete();
+          })
+        };
+
+      }), {
+        concurrent: !verbose,
+      }
+    )
+  };
+};
 
 /**
  * Create `yarn workspaces` and install node modules.
@@ -100,11 +160,30 @@ const setupServices = (title, cwd, services, verbose, enabled) => ({
  * @param {boolean}     verbose global _verbose_ option
  * @param {()=>boolean} enabled task enabler
  */
-const setupModules = (title, cwd, verbose, enabled) => ({
-  title,
-  task: () => installWorkspace(cwd, verbose),
-  enabled,
-});
+const setupModules = (title, verbose) => {
+
+  const { cwd } = getConfig();
+
+  return {
+    title,
+    task: () => new Observable(async observer => {
+
+      try {
+        observer.next(`Installing node_modules in ${cwd}`);
+        await installModules(cwd, verbose);
+      }
+      catch (error) {
+        if (verbose)
+          observer.next(error.message);
+        observer.error(error);
+      }
+
+      observer.complete();
+
+    })
+  };
+
+};
 
 /* COMMAND */
 
@@ -148,38 +227,48 @@ exports.setupTasks = {
  *
  * @param {SetupOpts} opts setup command options
  */
-exports.handler = (opts) => {
+exports.handler = async (opts) => {
 
-  const { cwd, services, templates } = getConfig();
+  const { cwd } = getConfig();
   const { install, template, service, verbose } = opts;
 
   const defaultRun = !install && !service && !template;
 
-  const tasks = new Listr([
-    createWorkspace(
-      'Create workspace',
-      cwd,
-    ),
-    setupTemplates(
-      'Set up templates',
-      cwd, templates, verbose,
-      () => template || defaultRun
-    ),
-    setupServices(
-      'Set up new services',
-      cwd, services, verbose,
-      () => service || defaultRun,
-    ),
-    setupModules(
-      'Install yarn workspace',
-      cwd, verbose,
-      () => install || defaultRun,
-    )
-  ],
-  {
+  const tasks = new Listr({
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
     collapse: false,
   });
+
+  const exists = await checkWorkspace(cwd);
+
+  if (!exists.workspace) {
+    tasks.add( createWorkspace('Create workspace', cwd) );
+  }
+
+  // --templates
+  if (template || defaultRun) {
+
+    if (exists.templates) tasks.add(
+      resetWorkspace('Remove existing templates', 'templates')
+    );
+
+    tasks.add( setupTemplates('Clone templates', verbose) );
+  }
+
+  // --services
+  if (service || defaultRun) {
+
+    if (exists.services) tasks.add(
+      resetWorkspace('Remove existing services', 'services')
+    );
+
+    tasks.add( setupServices('Clone services', verbose) );
+  }
+
+  // --modules
+  if (install || defaultRun) tasks.add(
+    setupModules( 'Install yarn workspace', verbose)
+  );
 
   tasks.run().catch(err => { /* console.error */ });
 
