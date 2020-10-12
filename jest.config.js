@@ -1,6 +1,13 @@
+const { cwd }  = require('process');
+const { join } = require('path');
+
+
 module.exports = {
+  collectCoverage: true,
+  setupFilesAfterEnv: ['./jest.setup.js'],
   testEnvironment: 'node',
   testMatch: [
-    '**/?(*.)+(test).js'
+    join(cwd(), '/tests/?(*.)+(test).js'),
   ],
+  verbose: true,
 };

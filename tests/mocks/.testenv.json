@@ -1,0 +1,25 @@
+{
+  "cwd": "./tests/mocks/test-env",
+  "env": {
+    "NODE_JQ_SKIP_INSTALL_BINARY": true
+  },
+  "docker": "",
+  "services": [
+    {
+      "name": "gql_server1",
+      "template": "gql",
+      "codegen": "gql-codegen",
+      "url": "http://localhost:3000/graphql"
+    }
+  ],
+  "models": [],
+  "patches": [],
+  "templates": [
+    {
+      "name": "gql",
+      "branch": "master",
+      "url": "https://github.com/Zendro-dev/graphql-server.git"
+    }
+  ],
+  "tests": []
+}

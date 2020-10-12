@@ -44,7 +44,7 @@ exports.installModules = async function (cwd, verbose) {
     join(cwd, 'package.json')
   );
 
-  await command('yarn install', {
+  return await command('yarn install', {
     cwd,
     stdio: verbose ? 'inherit' : 'pipe'
   });
