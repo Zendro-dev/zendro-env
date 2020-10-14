@@ -6,6 +6,9 @@ const { join, parse, resolve }                        = require('path');
 /**
  * Clone Zendro repository templates required to install the workspace.
  * @param {string}        cwd path to working directory
+ * @param {string?}    branch branch to use as HEAD
+ * @param {string}        src path to source repository
+ * @param {string}       dest path to output folder
  * @param {Template} template object containing branch and url information
  */
 exports.cloneTemplate = async function (cwd, branch, src, dest, verbose) {
