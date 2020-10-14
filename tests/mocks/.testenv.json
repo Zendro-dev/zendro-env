@@ -6,9 +6,9 @@
   "docker": "",
   "services": [
     {
-      "name": "gql_server1",
-      "template": "gql",
-      "codegen": "gql-codegen",
+      "name": "mock_service_1",
+      "template": "mock-service",
+      "codegen": "mock-codegen",
       "url": "http://localhost:3000/graphql"
     }
   ],
@@ -16,9 +16,15 @@
   "patches": [],
   "templates": [
     {
-      "name": "gql",
+      "name": "mock-service",
       "branch": "master",
       "url": "https://github.com/Zendro-dev/graphql-server.git"
+    },
+    {
+      "name": "mock-codegen",
+      "branch": "master",
+      "url": "../mock-codegen/.git",
+      "source": true
     }
   ],
   "tests": []

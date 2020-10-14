@@ -104,11 +104,11 @@ describe('Tool configuration', () => {
 
       const { expandPath } = require('../src/config/helpers');
 
-      const servicePath  = expandPath('gql_server1');
-      const templatePath = expandPath('gql');
+      const servicePath  = expandPath('mock_service_1');
+      const templatePath = expandPath('mock-service');
 
-      expect(servicePath).to.equal('services/gql_server1');
-      expect(templatePath).to.equal('templates/gql');
+      expect(servicePath).to.equal('services/mock_service_1');
+      expect(templatePath).to.equal('templates/mock-service');
 
     });
 
