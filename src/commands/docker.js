@@ -58,9 +58,9 @@ const checkDockerServiceConnections = (title, verbose) => {
             let attempts = 0;
             const maxAttempts = 10;
 
-            while (!response && attempts <= 10) {
+            while (!response && attempts <= maxAttempts) {
               try {
-                response = checkConnection(url);
+                response = await checkConnection(url);
               }
               catch (error) {
                 attempts++;
