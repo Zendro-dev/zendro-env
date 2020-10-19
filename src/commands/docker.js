@@ -58,23 +58,24 @@ const checkDockerServiceConnections = (title, verbose) => {
             let attempts = 0;
             const maxAttempts = 10;
 
-            while (!response && attempts <= maxAttempts) {
+            while (!response && attempts <= maxAttempts+1) {
               try {
                 response = await checkConnection(url);
               }
               catch (error) {
                 attempts++;
-                await sleep(2000);
-                observer.next(`Waiting for "${name}" -- attempt ${attempts}/${maxAttempts}`);
+                if (attempts > maxAttempts) {
+                  observer.error(error);
+                }
+                else {
+                  await sleep(2000);
+                  observer.next(`Waiting for "${name}" -- attempt ${attempts}/${maxAttempts}`);
+                }
               }
             }
 
-            if (!response) {
-              observer.error(new Error(`Connection to "${name}" @ ${url} failed`));
-            }
-            else {
+            if (response)
               observer.next(`Connected to ${name} @ ${url}`);
-            }
 
             observer.complete();
           }),
