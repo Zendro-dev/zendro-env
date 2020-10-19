@@ -16,18 +16,25 @@ const {
   resetEnvironment,
 } = require('../handlers/setup');
 
+const { isFalsy } = require('../utils/type-guards');
+
 
 /* TASKS */
 
 /**
  * Create a workspace folder if it does not exist.
  * @param {string} title task title
- * @param {string}   cwd path to working directory
  */
-const createWorkspace = (title, cwd) => ({
-  title,
-  task: () => resetEnvironment(cwd, null, true),
-});
+const createWorkspace = (title) => {
+
+  const { cwd } = getConfig();
+
+  return {
+    title,
+    task: () => resetEnvironment(cwd, null, true),
+  };
+
+};
 
 /**
  * Destroy any folder within the workspace. If the `folderPath` argument is not
@@ -66,6 +73,9 @@ const resetWorkspace = (title, folderPath, verbose) => {
 const setupTemplates = (title, verbose) => {
 
   const { cwd, templates } = getConfig();
+
+  if (isFalsy(templates))
+    throw new Error('Templates property is not configured');
 
   return {
     title,
@@ -114,7 +124,13 @@ const setupTemplates = (title, verbose) => {
  */
 const setupServices = (title, verbose) => {
 
-  const { cwd, services } = getConfig();
+  const { cwd, services, templates } = getConfig();
+
+  if (isFalsy(templates))
+    throw new Error('Templates must be configured to setup services');
+
+  if (isFalsy(services))
+    throw new Error('Services must be configured to setup services');
 
   return {
     title,
@@ -156,7 +172,6 @@ const setupServices = (title, verbose) => {
 /**
  * Create `yarn workspaces` and install node modules.
  * @param {string}        title task title
- * @param {string}          cwd path to working directory
  * @param {boolean}     verbose global _verbose_ option
  * @param {()=>boolean} enabled task enabler
  */
@@ -180,7 +195,11 @@ const setupModules = (title, verbose) => {
 
       observer.complete();
 
-    })
+    }),
+    skip: async () => {
+      const { services, templates } = await checkWorkspace();
+      return !(templates || services) && 'Neither services nor templates exist in the workspace';
+    }
   };
 
 };
@@ -229,7 +248,6 @@ exports.setupTasks = {
  */
 exports.handler = async (opts) => {
 
-  const { cwd } = getConfig();
   const { install, template, service, verbose } = opts;
 
   const defaultRun = !install && !service && !template;
@@ -239,10 +257,10 @@ exports.handler = async (opts) => {
     collapse: false,
   });
 
-  const exists = await checkWorkspace(cwd);
+  const exists = await checkWorkspace();
 
   if (!exists.workspace) {
-    tasks.add( createWorkspace('Create workspace', cwd) );
+    tasks.add( createWorkspace('Create workspace') );
   }
 
   // --templates
@@ -270,6 +288,6 @@ exports.handler = async (opts) => {
     setupModules( 'Install yarn workspace', verbose)
   );
 
-  tasks.run().catch(err => { /* console.error */ });
+  tasks.run();
 
 };
