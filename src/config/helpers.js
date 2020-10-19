@@ -1,5 +1,6 @@
+const { stat }             = require('fs/promises');
 const { join, sep, parse } = require('path');
-const { getConfig } = require('./config');
+const { getConfig }        = require('./config');
 
 
 /**
@@ -41,4 +42,44 @@ exports.expandPath = function (path) {
   return expandedName
     ? path.replace(name, expandedName)
     : null;
+};
+
+/**
+ * Check whether expected workspace folders exist.
+ * @param {string}        cwd path to working directory
+ * @param {string} folderName subfolder to check
+ */
+exports.checkWorkspace = async function (cwd) {
+
+  let exists = {
+    modules: false,
+    services: false,
+    templates: false,
+    workspace: false,
+  };
+
+  const check = async (path, name) => await stat(path)
+    .then(stats => {
+      exists[name] = true;
+    })
+    .catch(error => {
+      if (error.code !== 'ENOENT')
+        throw error;
+    });
+
+  await check(cwd, 'workspace');
+
+  if (exists.workspace) {
+
+    const modulesPath = join(cwd, 'node_modules');
+    await check(modulesPath, 'modules');
+
+    const servicesPath = join(cwd, 'services');
+    await check(servicesPath, 'services');
+
+    const templatesPath = join(cwd, 'templates');
+    await check(templatesPath, 'templates');
+  }
+
+  return exists;
 };
