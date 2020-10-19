@@ -180,7 +180,7 @@ exports.handler = async (opts) => {
     collapse: false,
   });
 
-  if (build || defaultRun) tasks.add(
+  if (build) tasks.add(
     buildDockerImages('Build docker images', verbose)
   );
 
