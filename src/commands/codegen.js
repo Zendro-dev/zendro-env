@@ -139,7 +139,7 @@ const applyPatches = (title, verbose) => {
       patches.map(patch => {
 
         const target  = expandPath(patch.target);
-        const options = composeOptionsString(patch.options);
+        const options = patch.options ? composeOptionsString(patch.options) : '';
 
         return {
           title: patch.path,
@@ -216,6 +216,9 @@ exports.handler = async (opts) => {
   if (patch || defaultRun) tasks.add( applyPatches('Apply patches', verbose) );
 
 
-  tasks.run().catch(err => { /* console.error */ });
+  tasks.run().catch(error => {
+    console.error(error.message);
+    process.exit(error.errno);
+  });
 
 };
