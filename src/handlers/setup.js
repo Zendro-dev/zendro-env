@@ -13,8 +13,10 @@ const { join, parse, resolve }                        = require('path');
  */
 exports.cloneTemplate = async function (cwd, branch, src, dest, verbose) {
 
+  branch = branch ? `--branch ${branch}` : '';
+
   return await command(
-    `git clone --branch ${branch || 'master'} ${src} ${dest}`, {
+    `git clone ${branch} ${src} ${dest}`, {
       cwd,
       stdio: verbose ? 'inherit' : 'pipe',
     });
