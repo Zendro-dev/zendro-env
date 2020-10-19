@@ -14,7 +14,6 @@
 
 /**
  * @typedef  {Object}  Service Service definition object
- * @property {string}  codegen name of its code generator template
  * @property {string}     name unique name of this service
  * @property {string} template repository template to use
  * @property {number}      url public port for sending requests to this service
@@ -23,19 +22,20 @@
 //
 
 /**
- * @typedef  {Object}    Model Environment model definition
- * @property {string[]}   opts options array for the code-generator
- * @property {string}     path relative location of the model definitions
- * @property {string[]} target gql- and spa-instances to which these models apply
+ * @typedef  {Object}     Model Environment model definition
+ * @property {string}   codegen name of the code generator template for this model
+ * @property {string[]} options options array for the code-generator
+ * @property {string}      path relative location of the model definitions
+ * @property {string[]} targets gql- and spa-instances to which these models apply
 **/
 
 //
 
 /**
- * @typedef  {Object}  Patch Patch definition object
- * @property {string[]} opts patch command arguments
- * @property {string}    src patch source file path
- * @property {string}   dest file to be patched
+ * @typedef  {Object}     Patch Patch definition object
+ * @property {string[]} options patch command arguments
+ * @property {string}      path path to patch file
+ * @property {string}    target target file to be patched
 **/
 
 //
@@ -51,7 +51,7 @@
 //
 
 /**
- * @typedef  {Object} Test Test runner environment definition
+ * @typedef  {Object}   Test Test runner environment definition
  * @property {string}   name test runner unique name
  * @property {string} runner test runner command
  * @property {string} target path to the tests file or config directory

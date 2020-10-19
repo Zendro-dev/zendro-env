@@ -1,7 +1,71 @@
-const { stat }             = require('fs/promises');
-const { join, sep, parse } = require('path');
-const { getConfig }        = require('./config');
+const { readFile, stat }            = require('fs/promises');
+const { join, sep, parse, resolve } = require('path');
+const { getConfig }                 = require('./config');
 
+
+/**
+ * Check whether expected workspace folders exist.
+ * @param {string}        cwd path to working directory
+ * @param {string} folderName subfolder to check
+ */
+exports.checkWorkspace = async function () {
+
+  const { cwd } = getConfig();
+
+  let exists = {
+    modules: false,
+    services: false,
+    templates: false,
+    workspace: false,
+  };
+
+  const check = async (path, name) => await stat(path)
+    .then(stats => {
+      exists[name] = true;
+    })
+    .catch(error => {
+      if (error.code !== 'ENOENT')
+        throw error;
+    });
+
+  await check(cwd, 'workspace');
+
+  if (exists.workspace) {
+
+    const modulesPath = join(cwd, 'node_modules');
+    await check(modulesPath, 'modules');
+
+    const servicesPath = join(cwd, 'services');
+    await check(servicesPath, 'services');
+
+    const templatesPath = join(cwd, 'templates');
+    await check(templatesPath, 'templates');
+  }
+
+  return exists;
+};
+
+/**
+ * Return a normalized joined string from a given options array.
+ *
+ * - Elements in the array are joined into a single space-separated string.
+ * - Elements are joined in the same order as the original array.
+ * - Any whitespace-containing string in the array is wrapped in quotes before being joined.
+ *
+ * @param {string[]} options list of option strings
+ */
+exports.composeOptionsString = function (options) {
+
+  return options
+    .map(arg => {
+
+      if (/\s/g.test(arg))
+        return `\\"${arg}\\"`;
+
+      return arg;
+    })
+    .join(' ');
+};
 
 /**
  * Expand the first segment of a path if it matches the name of a known
@@ -44,42 +108,22 @@ exports.expandPath = function (path) {
     : null;
 };
 
-/**
- * Check whether expected workspace folders exist.
- * @param {string}        cwd path to working directory
- * @param {string} folderName subfolder to check
- */
-exports.checkWorkspace = async function (cwd) {
+exports.getPackageMain = async function (name) {
 
-  let exists = {
-    modules: false,
-    services: false,
-    templates: false,
-    workspace: false,
-  };
+  const { cwd } = getConfig();
 
-  const check = async (path, name) => await stat(path)
-    .then(stats => {
-      exists[name] = true;
-    })
-    .catch(error => {
-      if (error.code !== 'ENOENT')
-        throw error;
-    });
+  // Path to the service or template package.json
+  const realPath = exports.expandPath(name);
+  const codegenJsonPath = resolve(cwd, join(realPath, 'package.json'));
 
-  await check(cwd, 'workspace');
+  const packageJson = JSON.parse(await readFile(codegenJsonPath));
 
-  if (exists.workspace) {
-
-    const modulesPath = join(cwd, 'node_modules');
-    await check(modulesPath, 'modules');
-
-    const servicesPath = join(cwd, 'services');
-    await check(servicesPath, 'services');
-
-    const templatesPath = join(cwd, 'templates');
-    await check(templatesPath, 'templates');
+  // Compose path to code-generator main *.js file
+  // Will be "null" if main is not defined in package.json
+  const { main } = packageJson;
+  if (!main) {
+    throw new Error(`Property "main" is not defined in ${name} package.json`);
   }
 
-  return exists;
+  return join(realPath, main);
 };
