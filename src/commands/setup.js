@@ -288,6 +288,9 @@ exports.handler = async (opts) => {
     setupModules( 'Install yarn workspace', verbose)
   );
 
-  tasks.run();
+  tasks.run().catch(error => {
+    console.error(error.message);
+    process.exit(error.errno);
+  });
 
 };
