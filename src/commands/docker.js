@@ -172,7 +172,7 @@ exports.handler = async (opts) => {
 
   const { build, check, down, up, verbose } = opts;
 
-  const defaultRun = !check && !down && !up;
+  const defaultRun = !build && !check && !down && !up;
 
   const tasks = new Listr({
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
