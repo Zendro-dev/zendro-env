@@ -15,6 +15,9 @@ const {
   generateCode,
   resetService,
 } = require('../handlers/codegen');
+const {
+  setupTasks
+} = require('./setup');
 const { isFalsy } = require('../utils/type-guards');
 
 
@@ -207,7 +210,7 @@ exports.handler = async (opts) => {
   });
 
   // --clean
-  if (clean || code || defaultRun) tasks.add( await resetServices('Reset services', verbose) );
+  if (clean || code || defaultRun) tasks.add( setupTasks.setupServices('Reset services', verbose) );
 
   // --code
   if (code || defaultRun) tasks.add( generateServicesCode('Generate code', verbose) );
