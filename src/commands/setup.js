@@ -146,6 +146,9 @@ const setupServices = (title, verbose) => {
           title: service.name,
           task: () => new Observable(async observer => {
 
+            observer.next(`Removing ${service.name}`);
+            await resetEnvironment(cwd, servicePath);
+
             try {
 
               observer.next(`cloning ${templatePath}`);
@@ -282,14 +285,8 @@ exports.handler = async (opts) => {
   }
 
   // --services
-  if (service || defaultRun) {
+  if (service || defaultRun) tasks.add( setupServices('Clone services', verbose) );
 
-    if (exists.services) tasks.add(
-      resetWorkspace('Remove existing services', 'services')
-    );
-
-    tasks.add( setupServices('Clone services', verbose) );
-  }
 
   // --modules
   if (install || defaultRun) tasks.add(
