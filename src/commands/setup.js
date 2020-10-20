@@ -151,14 +151,14 @@ const setupServices = (title, verbose) => {
               observer.next(`cloning ${templatePath}`);
               await cloneService(cwd, templatePath, servicePath);
 
-              observer.next(`renaming ${servicePath} package.json`);
-              await renamePackageJson(cwd, servicePath);
-
               if (template.source) {
 
                 observer.next('patching staged changes');
                 await cloneStaged(cwd, templatePath, servicePath, verbose);
               }
+
+              observer.next(`renaming ${servicePath} package.json`);
+              await renamePackageJson(cwd, servicePath);
             }
             catch (error) {
               if (verbose)
