@@ -16,8 +16,9 @@ const {
   resetService,
 } = require('../handlers/codegen');
 const {
-  setupTasks
-} = require('./setup');
+  cloneStaged
+} = require('../handlers/setup');
+
 const { isFalsy } = require('../utils/type-guards');
 
 
@@ -33,7 +34,7 @@ const { isFalsy } = require('../utils/type-guards');
  */
 const resetServices = async (title, verbose) => {
 
-  const { cwd, services } = getConfig();
+  const { cwd, services, templates } = getConfig();
 
   const exists = await checkWorkspace(cwd);
 
@@ -42,14 +43,40 @@ const resetServices = async (title, verbose) => {
     title,
 
     task: () => new Listr(
-      services.map(service => ({
-        title: service.name,
-        task: (ctx, task) => resetService(cwd, service, verbose)
-          .catch(error => {
-            if (error.code === 'ENOENT')
-              task.skip('Service is not installed');
-          }),
-      })),
+      services.map(service => {
+
+        const servicePath = expandPath(service.name);
+        const templatePath = expandPath(service.template);
+        const { source } = templates.find(t => t.name === service.template);
+
+        return {
+
+          title: service.name,
+
+          task: (ctx, task) => new Observable(async observer => {
+
+            try {
+              observer.next('Resetting service to its original state');
+              await resetService(cwd, servicePath, verbose);
+            }
+            catch (error) {
+              if (error.code === 'ENOENT')
+                task.skip('Service is not installed');
+              observer.error(error);
+              throw error;
+            }
+
+            if (source) {
+              observer.next('Applying staged source changes');
+              cloneStaged(cwd, templatePath, servicePath, verbose);
+            }
+
+            observer.complete();
+
+          })
+
+        };
+      }),
       {
         concurrent: !verbose,
       }
@@ -210,7 +237,7 @@ exports.handler = async (opts) => {
   });
 
   // --clean
-  if (clean || code || defaultRun) tasks.add( setupTasks.setupServices('Reset services', verbose) );
+  if (clean || code || defaultRun) tasks.add( await resetServices('Reset services', verbose) );
 
   // --code
   if (code || defaultRun) tasks.add( generateServicesCode('Generate code', verbose) );

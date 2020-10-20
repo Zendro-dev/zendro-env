@@ -40,20 +40,20 @@ exports.generateCode = async function (cwd, codegen, models, service, options, v
 /**
  *
  * @param {string}      cwd path to working directory
- * @param {Service} service service to reset
+ * @param {string}  service path to service folder
  * @param {boolean} verbose global _verbose_ option
  */
 exports.resetService = async function (cwd, service, verbose) {
 
   // Discard changed files
   await command('git reset --hard HEAD', {
-    cwd: join(cwd, 'services', service.name),
+    cwd: join(cwd, service),
     stdio: verbose ? 'inherit' : 'pipe',
   });
 
   // Clean untracked files
   await command('git clean -fd', {
-    cwd: join(cwd, 'services', service.name),
+    cwd: join(cwd, service),
     stdio: verbose ? 'inherit' : 'pipe',
   });
 };
