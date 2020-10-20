@@ -1,6 +1,19 @@
-const { command }                                     = require('execa');
-const { copyFile, readFile, mkdir, rmdir, writeFile } = require('fs/promises');
-const { join, parse, resolve }                        = require('path');
+const {
+  command
+} = require('execa');
+const {
+  copyFile,
+  mkdir,
+  readFile,
+  rmdir,
+  stat,
+  writeFile
+} = require('fs/promises');
+const {
+  join,
+  parse,
+  resolve
+} = require('path');
 
 
 /**
@@ -36,6 +49,37 @@ exports.cloneService = async function (cwd, templatePath, servicePath, verbose) 
     stdio: verbose ? 'inherit' : 'pipe'
   });
 
+};
+
+/**
+ * Patch a target repository with the _staged_ changes from another repository.
+ * This strategy applies _git diff_ and _git apply_ to apply the changes.
+ * @param {string} cwd path to working directory
+ * @param {string} source path to source repository
+ * @param {string} target path to target repository
+ * @param {boolean} verbose global _verbose_ option
+ */
+exports.cloneStaged = async function (cwd, source, target, verbose) {
+
+  // Create the patch file from only staged changes and save it as a file in the service folder
+  const { stdout } = await command('git diff --patch --staged', {
+    cwd: join(cwd, source),
+    stdio: verbose ? 'inherit' : 'pipe'
+  });
+
+  if (stdout) {
+
+    // Create a temporary patch file in the service folder
+    const patchName = `${parse(source).base}-${parse(target).base}.patch`;
+    const patchPath = resolve(cwd, target, patchName);
+    await writeFile(patchPath, stdout, { encoding: 'utf-8' });
+
+    // Apply the patch
+    await command(`git apply ${patchName}`, {
+      cwd: join(cwd, target),
+      stdio: verbose ? 'inherit' : 'pipe',
+    });
+  }
 };
 
 /**

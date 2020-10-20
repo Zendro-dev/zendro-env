@@ -11,6 +11,7 @@ const {
 const {
   cloneTemplate,
   cloneService,
+  cloneStaged,
   installModules,
   renamePackageJson,
   resetEnvironment,
@@ -135,13 +136,14 @@ const setupServices = (title, verbose) => {
   return {
     title,
     task: () => new Listr(
-      services.map(({ template, name }) => {
+      services.map(service => {
 
-        const templatePath = expandPath(template);
-        const servicePath  = expandPath(name);
+        const template = templates.find(t => t.name === service.template);
+        const templatePath = expandPath(service.template);
+        const servicePath  = expandPath(service.name);
 
         return {
-          title: name,
+          title: service.name,
           task: () => new Observable(async observer => {
 
             try {
@@ -151,6 +153,12 @@ const setupServices = (title, verbose) => {
 
               observer.next(`renaming ${servicePath} package.json`);
               await renamePackageJson(cwd, servicePath);
+
+              if (template.source) {
+
+                observer.next('patching staged changes');
+                await cloneStaged(cwd, templatePath, servicePath, verbose);
+              }
             }
             catch (error) {
               if (verbose)
