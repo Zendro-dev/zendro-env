@@ -61,20 +61,20 @@ exports.cloneService = async function (cwd, templatePath, servicePath, verbose) 
  */
 exports.cloneStaged = async function (cwd, source, target, verbose) {
 
+  // Create a temporary patch file in the service folder
+  const patchName = `${parse(source).base}-${parse(target).base}.patch`;
+  const patchPath = resolve(cwd, target, patchName);
+
   // Create the patch file from only staged changes and save it as a file in the service folder
-  const { stdout } = await command('git diff --patch --staged', {
+  await command(`git diff --patch --staged --output ${patchPath}`, {
     cwd: join(cwd, source),
     stdio: verbose ? 'inherit' : 'pipe'
   });
 
-  if (stdout) {
-
-    // Create a temporary patch file in the service folder
-    const patchName = `${parse(source).base}-${parse(target).base}.patch`;
-    const patchPath = resolve(cwd, target, patchName);
-    await writeFile(patchPath, stdout, { encoding: 'utf-8' });
-
-    // Apply the patch
+  // Verify that the patch file is not empty and apply the patch
+  const { size } = await stat(patchPath);
+  if (size > 0) {
+    console.log(patchName);
     await command(`git apply ${patchName}`, {
       cwd: join(cwd, target),
       stdio: verbose ? 'inherit' : 'pipe',
