@@ -14,6 +14,11 @@ const runTests = async (names) => {
   //   .filter(test => names === undefined || names.includes(test.name))
   //   .forEach(async test => await runTest(cwd, test, verbose));
 
+  if (!tests) {
+    console.log('No tests have been configured');
+    return;
+  }
+
   for (const test of tests) {
 
     // Skip test if name arguments are provided and the test name is not included
