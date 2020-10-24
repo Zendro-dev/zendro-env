@@ -40,7 +40,6 @@ const resetServices = async (title, verbose) => {
 
   const { cwd, services, templates } = getConfig();
 
-  const exists = await checkWorkspace(cwd);
 
   return {
 
@@ -89,7 +88,10 @@ const resetServices = async (title, verbose) => {
       }
     ),
 
-    enabled: () => exists.services
+    skip: async () => {
+      const exists = await checkWorkspace(cwd);
+      return !exists.services && 'No services are installed';
+    }
   };
 
 };
