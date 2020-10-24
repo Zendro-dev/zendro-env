@@ -29,7 +29,7 @@ exports.applyPatch = async function (cwd, patch, target, options, verbose) {
  */
 exports.generateCode = async function (cwd, codegen, models, service, options, verbose) {
 
-  return await command(`node ${codegen} -f ${models} -o ${service} ${options}`, {
+  await command(`node ${codegen} -f ${models} -o ${service} ${options}`, {
     cwd,
     stdio: verbose ? 'inherit' : 'pipe',
   });
