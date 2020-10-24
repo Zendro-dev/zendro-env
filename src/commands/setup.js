@@ -26,13 +26,15 @@ const { isFalsy } = require('../utils/type-guards');
  * Create a workspace folder if it does not exist.
  * @param {string} title task title
  */
-const createWorkspace = (title) => {
+const createWorkspace = async (title) => {
 
   const { cwd } = getConfig();
+  const exists  = await checkWorkspace();
 
   return {
     title,
     task: () => resetEnvironment(cwd, null, true),
+    enabled: () => !exists.workspace,
   };
 
 };
@@ -92,9 +94,11 @@ const setupTemplates = (title, verbose) => {
 
           task: () => new Observable(async observer => {
 
-            observer.next(`cloning ${url}`);
+            observer.next(`Removing ${name}`);
+            await resetEnvironment(cwd, dest);
 
             try {
+              observer.next(`cloning ${url}`);
               await cloneTemplate(cwd, branch, url, dest, verbose);
             }
             catch (error) {
@@ -268,25 +272,17 @@ exports.handler = async (opts) => {
     collapse: false,
   });
 
-  const exists = await checkWorkspace();
-
-  if (!exists.workspace) {
-    tasks.add( createWorkspace('Create workspace') );
-  }
+  tasks.add( await createWorkspace('Create workspace') );
 
   // --templates
-  if (template || defaultRun) {
-
-    if (exists.templates) tasks.add(
-      resetWorkspace('Remove existing templates', 'templates')
-    );
-
-    tasks.add( setupTemplates('Clone templates', verbose) );
-  }
+  if (template || defaultRun) tasks.add(
+    setupTemplates('Clone templates', verbose)
+  );
 
   // --services
-  if (service || defaultRun) tasks.add( setupServices('Clone services', verbose) );
-
+  if (service || defaultRun) tasks.add(
+    setupServices('Clone services', verbose)
+  );
 
   // --modules
   if (install || defaultRun) tasks.add(
