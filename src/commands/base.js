@@ -74,12 +74,8 @@ exports.builder = {
  */
 exports.handler = async (opts) => {
 
-  const {
-    cwd, docker, models, patches, services, templates, tests,
-  } = getConfig();
-
   /**
-   * Only runs with:
+   * A default run only supports:
    *    -k, --keep-running
    *    -v, --verbose
    */
@@ -92,40 +88,41 @@ exports.handler = async (opts) => {
 
   if (defaultRun) tasks.add([
 
-    setupTasks.createWorkspace('Create workspace', cwd),
-    setupTasks.setupTemplates('Set up templates', cwd, templates, opts.v),
-    setupTasks.setupServices('Set up service instances', cwd, services, opts.v),
-    setupTasks.setupModules('Install yarn workspace', cwd, opts.v),
+    await setupTasks.createWorkspace('Create workspace'),
+    setupTasks.setupTemplates('Set up templates', opts.v),
+    setupTasks.setupServices('Set up service instances', opts.v),
+    setupTasks.setupModules('Install yarn workspace', opts.v),
 
-    codegenTasks.resetServices('Clean generated code and patches', cwd, services, opts.v),
-    codegenTasks.generateServices('Generate code', cwd, models, services, templates, opts.v),
-    codegenTasks.applyPatches('Apply patches', cwd, patches, opts.v),
+    codegenTasks.generateServicesCode('Generate code', opts.v),
+    codegenTasks.applyPatches('Apply patches', opts.v),
 
-    dockerTasks.upDockerContainers('Start docker containers', cwd, docker, opts.v),
-    dockerTasks.checkDockerServiceConnections('Check service connections', services, opts.v),
+    dockerTasks.upDockerContainers('Start docker containers', opts.v),
+    dockerTasks.checkDockerServiceConnections('Check service connections', opts.v),
 
   ]);
 
   if (opts.c) tasks.add([
-    destroyTasks.destroyDockerEnv('Remove docker environment', cwd, docker, opts.v),
-    destroyTasks.destroyWorkEnv('Remove work environment', cwd, null),
+    destroyTasks.destroyDockerEnv('Remove docker environment', opts.v),
+    destroyTasks.destroyWorkEnv('Remove work environment'),
   ]);
 
-  if (opts.C || opts.g || opts.T) tasks.add([
-    dockerTasks.downDockerContainers('Stop docker containers', cwd, docker, opts.v),
-    codegenTasks.resetServices('Remove generated code', cwd, services, opts.v),
+  if (opts.C) tasks.add([
+    dockerTasks.downDockerContainers('Stop docker containers', opts.v),
+    codegenTasks.resetServices('Remove generated code', opts.v),
   ]);
 
-  if (opts.g || opts.T) tasks.add([
-
-    codegenTasks.generateServices('Generate code', cwd, models, services, templates, opts.v),
-    codegenTasks.applyPatches('Apply patches', cwd, patches, opts.v),
-
+  if (opts.g) tasks.add([
+    dockerTasks.downDockerContainers('Stop docker containers', opts.v),
+    codegenTasks.resetServices('Remove generated code', opts.v),
+    codegenTasks.generateServicesCode('Generate code', opts.v),
+    codegenTasks.applyPatches('Apply patches', opts.v),
   ]);
 
   if (opts.T) tasks.add([
-    dockerTasks.upDockerContainers('Start docker containers', cwd, docker, opts.v),
-    dockerTasks.checkDockerServiceConnections('Check service connections', services, opts.v),
+    dockerTasks.downDockerContainers('Stop docker containers', opts.v),
+    codegenTasks.resetServices('Remove generated code', opts.v),
+    dockerTasks.upDockerContainers('Start docker containers', opts.v),
+    dockerTasks.checkDockerServiceConnections('Check service connections', opts.v),
   ]);
 
   await tasks.run().catch(error => {
@@ -135,10 +132,10 @@ exports.handler = async (opts) => {
 
   // -t, --run-tests-only || -T, --generate-code-and-run-tests
   if (opts.t || opts.T || defaultRun)
-    await testTasks.runTests(cwd, tests, opts.testNames);
+    await testTasks.runTests(opts.testNames);
 
   // default && _not_ -k, keep-running
   if (defaultRun && !opts.k)
-    await dockerTasks.downDockerContainers('', cwd, docker, true).task();
+    await dockerTasks.downDockerContainers('', true).task();
 
 };
