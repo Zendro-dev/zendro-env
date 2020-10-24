@@ -38,7 +38,8 @@ exports.generateCode = async function (cwd, codegen, models, service, options, v
 };
 
 /**
- *
+ * Reset a service repository to its current HEAD and recursively clean
+ * untracked directories and files.
  * @param {string}      cwd path to working directory
  * @param {string}  service path to service folder
  * @param {boolean} verbose global _verbose_ option
