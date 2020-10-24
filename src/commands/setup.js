@@ -40,35 +40,6 @@ const createWorkspace = async (title) => {
 };
 
 /**
- * Destroy any folder within the workspace. If the `folderPath` argument is not
- * specified, the entire workspace will be destroyed.
- * @param {string}       title task title
- * @param {string?} folderPath path to workspace folder
- */
-const resetWorkspace = (title, folderPath, verbose) => {
-
-  const { cwd } = getConfig();
-
-  return {
-    title,
-    task: () => new Observable(async observer => {
-
-      try {
-        observer.next(`Removing ${folderPath}`);
-        await resetEnvironment(cwd, folderPath);
-      }
-      catch (error) {
-        if (verbose)
-          observer.next(error.message);
-        observer.error(error);
-      }
-
-      observer.complete();
-    })
-  };
-};
-
-/**
  * Re-generate upstream templates.
  * @param {string}    title task title
  * @param {boolean} verbose global _verbose_ option
@@ -94,17 +65,21 @@ const setupTemplates = (title, verbose) => {
 
           task: () => new Observable(async observer => {
 
-            observer.next(`Removing ${name}`);
-            await resetEnvironment(cwd, dest);
-
             try {
+
+              observer.next(`Removing ${name}`);
+              await resetEnvironment(cwd, dest);
+
               observer.next(`cloning ${url}`);
               await cloneTemplate(cwd, branch, url, dest, verbose);
+
             }
             catch (error) {
+
               if (verbose)
                 observer.next(error.message);
               observer.error(error);
+
             }
 
             observer.complete();
@@ -150,10 +125,10 @@ const setupServices = (title, verbose) => {
           title: service.name,
           task: () => new Observable(async observer => {
 
-            observer.next(`Removing ${service.name}`);
-            await resetEnvironment(cwd, servicePath);
-
             try {
+
+              observer.next(`Removing ${service.name}`);
+              await resetEnvironment(cwd, servicePath);
 
               observer.next(`cloning ${templatePath}`);
               await cloneService(cwd, templatePath, servicePath);
@@ -166,11 +141,14 @@ const setupServices = (title, verbose) => {
 
               observer.next(`renaming ${servicePath} package.json`);
               await renamePackageJson(cwd, servicePath);
+
             }
             catch (error) {
+
               if (verbose)
                 observer.next(error.message);
               observer.error(error);
+
             }
 
             observer.complete();
