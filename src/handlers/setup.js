@@ -17,25 +17,6 @@ const {
 
 
 /**
- * Clone Zendro repository templates required to install the workspace.
- * @param {string}        cwd path to working directory
- * @param {string?}    branch branch to use as HEAD
- * @param {string}        src path to source repository
- * @param {string}       dest path to output folder
- * @param {Template} template object containing branch and url information
- */
-exports.cloneTemplate = async function (cwd, branch, src, dest, verbose) {
-
-  branch = branch ? `--branch ${branch}` : '';
-
-  return await command(
-    `git clone ${branch} ${src} ${dest}`, {
-      cwd,
-      stdio: verbose ? 'inherit' : 'pipe',
-    });
-};
-
-/**
  * Clone a new environment service.
  * @param {string}           cwd path to workspace folder
  * @param {string}  templatePath relative path to template from cwd
@@ -80,6 +61,25 @@ exports.cloneStaged = async function (cwd, source, target, verbose) {
       stdio: verbose ? 'inherit' : 'pipe',
     });
   }
+};
+
+/**
+ * Clone Zendro repository templates required to install the workspace.
+ * @param {string}        cwd path to working directory
+ * @param {string?}    branch branch to use as HEAD
+ * @param {string}        src path to source repository
+ * @param {string}       dest path to output folder
+ * @param {Template} template object containing branch and url information
+ */
+exports.cloneTemplate = async function (cwd, branch, src, dest, verbose) {
+
+  branch = branch ? `--branch ${branch}` : '';
+
+  return await command(
+    `git clone ${branch} ${src} ${dest}`, {
+      cwd,
+      stdio: verbose ? 'inherit' : 'pipe',
+    });
 };
 
 /**
