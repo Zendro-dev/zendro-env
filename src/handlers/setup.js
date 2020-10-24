@@ -55,7 +55,6 @@ exports.cloneStaged = async function (cwd, source, target, verbose) {
   // Verify that the patch file is not empty and apply the patch
   const { size } = await stat(patchPath);
   if (size > 0) {
-    console.log(patchName);
     await command(`git apply ${patchName}`, {
       cwd: join(cwd, target),
       stdio: verbose ? 'inherit' : 'pipe',
