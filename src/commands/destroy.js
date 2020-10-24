@@ -19,7 +19,19 @@ const destroyDockerEnv = (title, verbose) => {
 
   return {
     title,
-    task: () => deleteDockerEnv(cwd, docker, verbose),
+    task: async (ctx, task) => {
+
+      await deleteDockerEnv(cwd, docker, verbose)
+        .catch(error => {
+          if (verbose)
+            console.error(
+              'Please, verify that docker and docker-compose are installed',
+              'and docker is running.'
+            );
+          task.skip('Could not execute "docker-compose"');
+        });
+
+    }
   };
 };
 
@@ -94,6 +106,7 @@ exports.handler = (opts) => {
   const tasks = new Listr({
     collapse: false,
     concurrent: !verbose,
+    exitOnError: false,
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
   });
 
@@ -110,7 +123,7 @@ exports.handler = (opts) => {
   );
 
   if (modules || defaultRun) tasks.add(
-    destroyWorkEnv('Remove all templates', 'node_modules', verbose)
+    destroyWorkEnv('Remove installed node modules', 'node_modules', verbose)
   );
 
   tasks.run().catch(error => {
