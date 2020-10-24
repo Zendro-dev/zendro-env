@@ -1,5 +1,4 @@
 const { command } = require('execa');
-const { join }    = require('path');
 
 
 /**
@@ -35,26 +34,4 @@ exports.generateCode = async function (cwd, codegen, models, service, options, v
     stdio: verbose ? 'inherit' : 'pipe',
   });
 
-};
-
-/**
- * Reset a service repository to its current HEAD and recursively clean
- * untracked directories and files.
- * @param {string}      cwd path to working directory
- * @param {string}  service path to service folder
- * @param {boolean} verbose global _verbose_ option
- */
-exports.resetService = async function (cwd, service, verbose) {
-
-  // Discard changed files
-  await command('git reset --hard HEAD', {
-    cwd: join(cwd, service),
-    stdio: verbose ? 'inherit' : 'pipe',
-  });
-
-  // Clean untracked files
-  await command('git clean -fd', {
-    cwd: join(cwd, service),
-    stdio: verbose ? 'inherit' : 'pipe',
-  });
 };

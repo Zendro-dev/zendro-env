@@ -3,17 +3,21 @@ const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
 const { Observable }  = require('rxjs');
 
-const { getConfig }      = require('../config/config');
+const { getConfig } = require('../config/config');
 const {
   checkWorkspace,
   composeOptionsString,
   expandPath,
   getPackageMain,
 } = require('../config/helpers');
+
+const {
+  cleanRepository,
+  resetRepository,
+} = require('../handlers/branch');
 const {
   applyPatch,
   generateCode,
-  resetService,
 } = require('../handlers/codegen');
 const {
   cloneStaged
@@ -47,7 +51,7 @@ const resetServices = async (title, verbose) => {
 
         const servicePath = expandPath(service.name);
         const templatePath = expandPath(service.template);
-        const { source } = templates.find(t => t.name === service.template);
+        const template = templates.find(t => t.name === service.template);
 
         return {
 
@@ -56,19 +60,22 @@ const resetServices = async (title, verbose) => {
           task: (ctx, task) => new Observable(async observer => {
 
             try {
-              observer.next('Resetting service to its original state');
-              await resetService(cwd, servicePath, verbose);
+              observer.next('Resetting repository to its current HEAD');
+              await resetRepository(cwd, servicePath, null, null, verbose);
+
+              observer.next('Removing untracked files');
+              await cleanRepository(cwd, servicePath, verbose);
+
             }
             catch (error) {
               if (error.code === 'ENOENT')
                 task.skip('Service is not installed');
-              observer.error(error);
-              throw error;
+              observer.error(error.message);
             }
 
-            if (source) {
+            if (template.source) {
               observer.next('Applying staged source changes');
-              cloneStaged(cwd, templatePath, servicePath, verbose);
+              await cloneStaged(cwd, templatePath, servicePath, verbose);
             }
 
             observer.complete();
@@ -124,9 +131,8 @@ const generateServicesCode = (title, verbose) => {
                 await generateCode(cwd, await codegen, model.path, servicePath, options, verbose);
               }
               catch (error) {
-                if (verbose)
-                  observer.next(error.message);
-                observer.error(error.message);
+                observer.next(error.message);
+                observer.error(error);
               }
 
               observer.complete();
@@ -210,7 +216,7 @@ exports.builder  = {
 
 exports.codegenTasks = {
   applyPatches,
-  generateServices: generateServicesCode,
+  generateServicesCode,
   resetServices,
 };
 
@@ -247,7 +253,8 @@ exports.handler = async (opts) => {
 
 
   tasks.run().catch(error => {
-    console.error(error.message);
+    if (verbose)
+      console.error(error.message);
     process.exit(error.errno);
   });
 
