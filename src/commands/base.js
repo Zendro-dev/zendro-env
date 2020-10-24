@@ -108,19 +108,19 @@ exports.handler = async (opts) => {
 
   if (opts.C) tasks.add([
     dockerTasks.downDockerContainers('Stop docker containers', opts.v),
-    codegenTasks.resetServices('Remove generated code', opts.v),
+    await codegenTasks.resetServices('Remove generated code', opts.v),
   ]);
 
   if (opts.g) tasks.add([
     dockerTasks.downDockerContainers('Stop docker containers', opts.v),
-    codegenTasks.resetServices('Remove generated code', opts.v),
+    await codegenTasks.resetServices('Remove generated code', opts.v),
     codegenTasks.generateServicesCode('Generate code', opts.v),
     codegenTasks.applyPatches('Apply patches', opts.v),
   ]);
 
   if (opts.T) tasks.add([
     dockerTasks.downDockerContainers('Stop docker containers', opts.v),
-    codegenTasks.resetServices('Remove generated code', opts.v),
+    await codegenTasks.resetServices('Remove generated code', opts.v),
     dockerTasks.upDockerContainers('Start docker containers', opts.v),
     dockerTasks.checkDockerServiceConnections('Check service connections', opts.v),
   ]);
