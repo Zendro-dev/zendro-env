@@ -1,6 +1,7 @@
 const { readFile, stat }            = require('fs/promises');
 const { join, sep, parse, resolve } = require('path');
 const { getConfig }                 = require('./config');
+const { pathExists, isRemote }      = require('../utils/path-guards');
 
 
 /**
@@ -12,34 +13,16 @@ exports.checkWorkspace = async function () {
 
   const { cwd } = getConfig();
 
-  let exists = {
-    modules: false,
-    services: false,
-    templates: false,
-    workspace: false,
-  };
+  let exists = {};
 
-  const check = async (path, name) => await stat(path)
-    .then(stats => {
-      exists[name] = true;
-    })
-    .catch(error => {
-      if (error.code !== 'ENOENT')
-        throw error;
-    });
-
-  await check(cwd, 'workspace');
+  exists.workspace = await pathExists(cwd);
 
   if (exists.workspace) {
 
-    const modulesPath = join(cwd, 'node_modules');
-    await check(modulesPath, 'modules');
+    exists.cache    = await pathExists(join(cwd, 'cache'));
+    exists.modules  = await pathExists(join(cwd, 'node_modules'));
+    exists.services = await pathExists(join(cwd, 'services'));
 
-    const servicesPath = join(cwd, 'services');
-    await check(servicesPath, 'services');
-
-    const templatesPath = join(cwd, 'templates');
-    await check(templatesPath, 'templates');
   }
 
   return exists;
@@ -68,52 +51,99 @@ exports.composeOptionsString = function (options) {
 };
 
 /**
- * Expand the first segment of a path if it matches the name of a known
- * service or template.
+ * Get the path to a service repository from the given name or path.
+ *
+ * - If the "path" parameter is a service name, the service folder path
+ *   will be returned.
+ *
+ * - If the "path" parameter is an actual path, the first segment of the
+ *   path will be expanded to the service folder path.
+ *
  * @param   {string}  path name of the service or template
- * @returns {string?} path to the service or template name
+ * @returns {string?} path to the service folder from the `cwd`
  */
-exports.expandPath = function (path) {
+exports.servicePath = function (path) {
 
-  const { services, templates } = getConfig();
-
-  // Expanded path
-  let expandedName = null;
+  const { services } = getConfig();
 
   // First segment of the path to expand
-  const name = path.split(sep)[0];
+  const name = path.split(sep).shift();
 
   // Search for the segment in known services
   let service = services.find(service => service.name === name);
-  if (service) expandedName = join('services', service.name);
-
-  // Search for the segment in known templates
-  if (!expandedName) {
-
-    const template = templates.find(template => template.name === name);
-
-    if (template) {
-
-      expandedName = template.source
-        ? parse(template.url).dir
-        : join('templates', template.name);
-
-    }
-
-  }
 
   // Replace segment in the original path with the expanded path
-  return expandedName
-    ? path.replace(name, expandedName)
+  return service
+    ? path.replace(name, join('services', service.name))
     : null;
 };
 
+/**
+ * Resolve a service properties to their actual object values.
+ * @param {Service} service configured service object
+ */
+exports.parseService = async function (service) {
+
+  const path = exports.servicePath(service.name);
+  const template = await exports.parseTemplate(service.template);
+
+  return {
+    ...service,
+    path,
+    template,
+  };
+
+};
+
+/**
+ * Resolve a template object from its repository address.
+ * @param {string} repository url or path to the template repository
+ */
+exports.parseTemplate = async function (repository) {
+
+  const { cwd } = getConfig();
+
+  /**
+   * Determine whether the template is "source" or "remote".
+   *
+   * - A source template is a local path defined by the user and should always exist.
+   * - A remote template is a user-defined upstream and will be saved to an internal cache
+   *   within the `cwd` * folder.
+   */
+  const source = isRemote(repository)
+    ? false
+    : true;
+
+  /**
+   * Determine the real path to the template repository.
+   *
+   * - A source template will always resolve to the user-defined path.
+   * - A remote template will be stored in the "cache" folder within the `cwd`
+   */
+  const path = source ? repository : join('cache', parse(repository).name);
+
+  /**
+   * Determine whether the repository is already installed in the cache.
+   */
+  const installed = await pathExists( resolve(cwd, path) );
+
+  return {
+    installed,
+    path,
+    source,
+  };
+};
+
+/**
+ * Get the path to a package main entry file.
+ * @param {string} name name of the package
+ */
 exports.getPackageMain = async function (name) {
 
   const { cwd } = getConfig();
 
   // Path to the service or template package.json
-  const realPath = exports.expandPath(name);
+  const realPath = exports.servicePath(name);
   const codegenJsonPath = resolve(cwd, join(realPath, 'package.json'));
 
   const packageJson = JSON.parse(await readFile(codegenJsonPath));

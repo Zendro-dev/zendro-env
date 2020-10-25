@@ -14,7 +14,7 @@ const {
 const {
   cleanRepository,
   resetRepository,
-} = require('../handlers/branch');
+} = require('../handlers/git');
 const {
   applyPatch,
   generateCode,

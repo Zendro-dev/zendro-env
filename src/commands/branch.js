@@ -10,7 +10,7 @@ const {
   checkoutBranch,
   fetchAll,
   resetRepository,
-} = require('../handlers/branch');
+} = require('../handlers/git');
 const {
   resetEnvironment,
   cloneService
