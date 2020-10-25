@@ -1,51 +1,28 @@
 const { command }        = require('execa');
 const { default: fetch } = require('node-fetch');
-const { Observable }     = require('rxjs');
-const { promisify }      = require('util');
-
-const sleep = promisify(setTimeout);
-
 
 /**
- * Check the docker services are up and ready to take requests.
+ * Rebuild the docker-compose environment images.
  * @param {string}      cwd path to workspace folder
- * @param {Service} service environment services
+ * @param {string}   docker path to docker-compose.yml file
  * @param {boolean} verbose global _verbose_ option
  */
-exports.checkDockerEnv = async function (service, maxConnectionAttempts = 10) {
+exports.buildImages = async function (cwd, dockerfile, verbose) {
 
-  return new Observable(async observer => {
-
-    const { name, url } = service;
-
-    // Attempt to fetch from the service
-    observer.next(`Connecting to ${name}`);
-    let response;
-    let attempts = 0;
-    while (!response && attempts <= maxConnectionAttempts) {
-      try {
-        response = await fetch(url);
-      }
-      catch (error) {
-        attempts++;
-        await sleep(2000);
-        observer.next(
-          `Service "${name}" is not responding -- retrying (${attempts}/${maxConnectionAttempts})`
-        );
-      }
-    }
-
-    // Complete the observer
-    if (!response) {
-      observer.error(new Error(`Connection to "${name}" @ ${url} failed`));
-    }
-    else {
-      observer.next(`Connected to ${name} @ ${url}`);
-    }
-
-    observer.complete();
-
+  await command(`docker-compose -f ${dockerfile} build`, {
+    cwd,
+    stdio: verbose ? 'inherit' : 'pipe'
   });
+
+};
+
+/**
+ * Check that a remote resource is up and ready to take requests.
+ * @param {string} url resource URL
+ */
+exports.checkConnection = async function (url) {
+
+  return await fetch(url);
 
 };
 
@@ -89,13 +66,13 @@ exports.downContainers = async function (cwd, docker, verbose) {
  * @param {string}   docker path to docker-compose.yml file
  * @param {boolean} verbose global _verbose_ option
  */
-exports.upContainers = async function (cwd, docker, verbose) {
+exports.upContainers = async function (cwd, dockerfile, verbose) {
 
   const flags = '-d --force-recreate --remove-orphans --renew-anon-volumes';
 
-  await command(`docker-compose -f ${docker} up ${flags}`, {
+  await command(`docker-compose -f ${dockerfile} up ${flags}`, {
     cwd,
     stdio: verbose ? 'inherit' : 'pipe'
-  }).catch(error => { throw error; });
+  });
 
 };

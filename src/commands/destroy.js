@@ -10,31 +10,45 @@ const { deleteDockerEnv }  = require('../handlers/docker');
 
 /**
  * Destroy containers, images, and volumes.
- * @param {string}          title task title
- * @param {string}            cwd path to working directory
- * @param {string}         docker path to docker-compose file
- * @param {boolean}       verbose global _verbose_option
- * @param {() => boolean} enabled whether the task is enabled
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_option
  */
-const destroyDockerEnv = (title, cwd, docker, verbose, enabled) => ({
-  title,
-  task: () => deleteDockerEnv(cwd, docker, verbose),
-  enabled,
-});
+const destroyDockerEnv = (title, verbose) => {
 
+  const { cwd, docker } = getConfig();
+
+  return {
+    title,
+    task: async (ctx, task) => {
+
+      await deleteDockerEnv(cwd, docker, verbose)
+        .catch(error => {
+          if (verbose)
+            console.error(
+              'Please, verify that docker and docker-compose are installed',
+              'and docker is running.'
+            );
+          task.skip('Could not execute "docker-compose"');
+        });
+
+    }
+  };
+};
 
 /**
  * Fully or partially destroy the working environment.
- * @param {string}             title task title
- * @param {string}               cwd path to working directory
- * @param {string}        folderName workspace subfolder
- * @param {() => boolean}    enabled whether the task is enabled
+ * @param {string}      title task title
+ * @param {string} folderName workspace subfolder
  */
-const destroyWorkEnv = (title, cwd, folderName, enabled) => ({
-  title,
-  task: () => resetEnvironment(cwd, folderName, false),
-  enabled,
-});
+const destroyWorkEnv = (title, folderName) => {
+
+  const { cwd } = getConfig();
+
+  return {
+    title,
+    task: () => resetEnvironment(cwd, folderName, false),
+  };
+};
 
 
 /* COMMAND */
@@ -85,39 +99,37 @@ exports.destroyTasks = {
  */
 exports.handler = (opts) => {
 
-  const { cwd, docker } = getConfig();
   const { compose, modules, service, template, verbose } = opts;
 
   const defaultRun = !compose && !service && !template;
 
-  const tasks = new Listr([
-    destroyDockerEnv(
-      'Remove docker containers, images, and volumes',
-      cwd, docker, verbose,
-      () => compose || defaultRun,
-    ),
-    destroyWorkEnv(
-      'Remove services',
-      cwd, 'services',
-      () => service || defaultRun
-    ),
-    destroyWorkEnv(
-      'Remove templates',
-      cwd, 'templates',
-      () => template || defaultRun
-    ),
-    destroyWorkEnv(
-      'Remove node modules',
-      cwd, 'node_modules',
-      () => modules || defaultRun
-    ),
-  ], {
+  const tasks = new Listr({
     collapse: false,
     concurrent: !verbose,
+    exitOnError: false,
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
   });
 
-  tasks.run().catch(err => { /* console.error */ });
+  if (compose || defaultRun) tasks.add(
+    destroyDockerEnv('Remove docker containers, images, and volumes', verbose)
+  );
+
+  if (service || defaultRun) tasks.add(
+    destroyWorkEnv('Remove all services', 'services', verbose)
+  );
+
+  if (template || defaultRun) tasks.add(
+    destroyWorkEnv('Remove all templates', 'templates', verbose)
+  );
+
+  if (modules || defaultRun) tasks.add(
+    destroyWorkEnv('Remove installed node modules', 'node_modules', verbose)
+  );
+
+  tasks.run().catch(error => {
+    console.error(error.message);
+    process.exit(error.errno);
+  });
 
   // TODO: Check if `cwd` is empty, if so delete
 

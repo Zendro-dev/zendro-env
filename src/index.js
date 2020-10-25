@@ -39,4 +39,5 @@ yargs
   .strict()                   // do not allow unknown options
   .wrap(100)                  // adjust stdout to 100 columns
   .usage(usage)               // add custom usage message
+  .showHelpOnFail(false)      // do not print the help message on error
   .parse();                   // parse and execute command handlers

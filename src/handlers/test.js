@@ -32,7 +32,7 @@ exports.runTest = async function (cwd, test, verbose) {
   }
 
   // Launch the test-runner
-  await command(`npx ${runner} ${isFile ? `${testFile} --no-config` : ''} ${options || ''}`, {
+  await command(`npx ${runner} ${isFile ? `${testFile}` : ''} ${options || ''}`, {
     cwd: isFile ? testFileCwd : targetPath,
     stdio: 'inherit'
   });

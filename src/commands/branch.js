@@ -1,12 +1,17 @@
 const Listr           = require('listr');
 const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
+const { Observable }  = require('rxjs');
 
-const { getConfig }      = require('../config/config');
-const { expandPath }     = require('../config/helpers');
-const { checkoutBranch } = require('../handlers/branch');
+const { getConfig }                   = require('../config/config');
+const { expandPath, checkWorkspace }  = require('../config/helpers');
+
 const {
-  checkWorkspace,
+  checkoutBranch,
+  fetchAll,
+  resetRepository,
+} = require('../handlers/branch');
+const {
   resetEnvironment,
   cloneService
 } = require('../handlers/setup');
@@ -16,22 +21,49 @@ const {
 
 /**
  * Checkout a template branch.
- * @param {string}       name template name
- * @param {string}     remote upstream remote
- * @param {string}     branch target branch
- * @param {boolean}   verbose global _verbose_ option
+ * @param {string}     name template name
+ * @param {string}   remote upstream remote
+ * @param {string}   branch target branch
+ * @param {boolean} verbose global _verbose_ option
  */
 const checkoutTemplateBranch = (title, name, remote, branch, verbose) => {
 
-  const { cwd, ...config } = getConfig();
+  const { cwd, templates } = getConfig();
 
-  // Matching template definition
-  const template = config.templates.find(template => template.name === name);
+  // Template matching the given name
+  const template = templates.find(template => template.name === name);
 
-  // Listr task
   return {
+
     title,
-    task: () => checkoutBranch(cwd, expandPath(template.name), remote, branch, verbose),
+
+    task: () => new Observable(async observer => {
+
+      const templatePath = expandPath(template.name);
+
+      try {
+
+        // Fetch latest changes from remote
+        observer.next('Fetching all from remote');
+        await fetchAll(cwd, templatePath, verbose);
+
+        // Force checkout to target branch
+        observer.next(`Forcefully checking ${branch}`);
+        await checkoutBranch(cwd, templatePath, branch, verbose);
+
+        // Move branch HEAD to the latest commit
+        observer.next('Moving HEAD to the latest commit');
+        await resetRepository(cwd, templatePath, remote, branch, verbose);
+
+      }
+      catch (error) {
+        observer.error(error);
+      }
+
+      observer.complete();
+
+    }),
+
     skip: () => {
       if (!template)
         return `Template ${name} does not exist`;
@@ -55,7 +87,6 @@ const updateTemplateDependencies = (title, name, verbose) => {
 
   // Matching template definition
   const template = config.templates.find(template => template.name === name);
-  const templateCwdPath = expandPath(template.name);
 
   // Associated services
   const services = config.services.filter(service => service.template === name);
@@ -66,9 +97,15 @@ const updateTemplateDependencies = (title, name, verbose) => {
 
     enabled: () => template && !template.source,
 
-    skip: async () => await checkWorkspace(cwd, 'services')
-      ? false
-      : 'No services installed',
+    skip: async () => {
+      const exists = await checkWorkspace();
+
+      if (!exists.services)
+        return 'No services installed';
+
+      if (!services)
+        return `No services are associated with ${template.name}`;
+    },
 
     task: () => new Listr(
       services.map(service => {
@@ -90,7 +127,7 @@ const updateTemplateDependencies = (title, name, verbose) => {
             },
             {
               title: 'Clone service',
-              task: () => cloneService(cwd, templateCwdPath, serviceCwdPath, verbose)
+              task: () => cloneService(cwd, expandPath(template.name), serviceCwdPath, verbose)
             },
           ]),
 
@@ -107,7 +144,7 @@ const updateTemplateDependencies = (title, name, verbose) => {
 
 exports.command = 'branch <name> <remote> <branch>';
 
-exports.describe = 'Checkout a new repository branch.';
+exports.describe = 'Checkout a new repository branch';
 
 exports.builder = {};
 
@@ -139,5 +176,8 @@ exports.handler = (opts) => {
     collapse: false,
   });
 
-  tasks.run().catch(err => {/**/});
+  tasks.run().catch(error => {
+    console.error(error.message);
+    process.exit(error.errno);
+  });
 };
