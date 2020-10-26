@@ -1,19 +1,19 @@
-const Listr           = require('listr');
-const VerboseRenderer = require('listr-verbose-renderer');
-const UpdaterRenderer = require('listr-update-renderer');
-const { Observable }  = require('rxjs');
-
-const { getConfig }                   = require('../config/config');
-const { expandPath, checkWorkspace }  = require('../config/helpers');
+const Listr            = require('listr');
+const VerboseRenderer  = require('listr-verbose-renderer');
+const UpdaterRenderer  = require('listr-update-renderer');
+const { Observable }   = require('rxjs');
+const { getConfig }    = require('../config/config');
+const { parseService } = require('../config/helpers');
 
 const {
   checkoutBranch,
-  fetchAll,
+  cloneRepository,
   resetRepository,
 } = require('../handlers/git');
+
 const {
   resetEnvironment,
-  cloneService
+  renamePackageJson
 } = require('../handlers/setup');
 
 
@@ -26,151 +26,101 @@ const {
  * @param {string}   branch target branch
  * @param {boolean} verbose global _verbose_ option
  */
-const checkoutTemplateBranch = (title, name, remote, branch, verbose) => {
+const checkoutServiceBranch = (title, serviceName, branch, verbose) => ({
 
-  const { cwd, templates } = getConfig();
+  title,
 
-  // Template matching the given name
-  const template = templates.find(template => template.name === name);
+  task: (ctx, task) => new Observable(async observer => {
 
-  return {
+    const { cwd, services } = getConfig();
 
-    title,
+    const serviceJson = services.find(serviceJson => serviceJson.name === serviceName);
 
-    task: () => new Observable(async observer => {
+    if (!serviceJson) {
+      observer.error(new Error(`service ${serviceName} is not configured`));
+      observer.complete();
+    }
 
-      const templatePath = expandPath(template.name);
+    try {
 
-      try {
+      const { template, ...service } = await parseService(serviceJson);
 
-        // Fetch latest changes from remote
-        observer.next('Fetching all from remote');
-        await fetchAll(cwd, templatePath, verbose);
+      if (template.source) {
+        task.skip(`source service "${service.name}" should be managed manually`);
+        observer.complete();
+      }
+
+      else if (!template.installed) {
+        observer.error(new Error(`cache for service "${service.name}" needs to be setup first`));
+        observer.complete();
+      }
+
+      else {
 
         // Force checkout to target branch
-        observer.next(`Forcefully checking ${branch}`);
-        await checkoutBranch(cwd, templatePath, branch, verbose);
+        observer.next(`forcefully checkout ${branch}`);
+        await checkoutBranch(cwd, template.path, branch, verbose);
 
         // Move branch HEAD to the latest commit
-        observer.next('Moving HEAD to the latest commit');
-        await resetRepository(cwd, templatePath, remote, branch, verbose);
+        observer.next('moving HEAD to the latest commit');
+        await resetRepository(cwd, template.path, branch, verbose);
 
+        observer.next(`removing ${service.name}`);
+        await resetEnvironment(cwd, service.path);
+
+        observer.next(`cloning ${branch} from ${template.path}`);
+        await cloneRepository(cwd, {
+          branch: branch,
+          source: template.path,
+          output: service.path,
+          verbose,
+        });
+
+        observer.next(`renaming module to ${service.name}`);
+        await renamePackageJson(cwd, service.path);
+
+        observer.next(`return cache to ${service.branch}`);
       }
-      catch (error) {
-        observer.error(error);
-      }
 
-      observer.complete();
+    }
+    catch (error) {
+      observer.error(error);
+    }
 
-    }),
+    observer.complete();
 
-    skip: () => {
-      if (!template)
-        return `Template ${name} does not exist`;
-
-      if (template.source)
-        return 'Source templates must be managed manually.';
-    },
-  };
-};
-
-
-/**
- * Recreate template dependencies.
- * @param {string}    title task title
- * @param {string}     name template name
- * @param {boolean} verbose global _verbose_ option
- */
-const updateTemplateDependencies = (title, name, verbose) => {
-
-  const { cwd, ...config } = getConfig();
-
-  // Matching template definition
-  const template = config.templates.find(template => template.name === name);
-
-  // Associated services
-  const services = config.services.filter(service => service.template === name);
-
-  // Listr task
-  return {
-    title,
-
-    enabled: () => template && !template.source,
-
-    skip: async () => {
-      const exists = await checkWorkspace();
-
-      if (!exists.services)
-        return 'No services installed';
-
-      if (!services)
-        return `No services are associated with ${template.name}`;
-    },
-
-    task: () => new Listr(
-      services.map(service => {
-
-        const serviceCwdPath = expandPath(service.name);
-
-        return {
-
-          title: `${service.name}`,
-
-          skip: async () => await checkWorkspace(cwd, serviceCwdPath)
-            ? false
-            : 'Service is not installed',
-
-          task: () => new Listr([
-            {
-              title: 'Remove existing service',
-              task: () => resetEnvironment(cwd, serviceCwdPath),
-            },
-            {
-              title: 'Clone service',
-              task: () => cloneService(cwd, expandPath(template.name), serviceCwdPath, verbose)
-            },
-          ]),
-
-        };
-      }), {
-        concurrent: !verbose
-      }
-    )
-  };
-};
+  }),
+});
 
 
 /* COMMAND */
 
-exports.command = 'branch <name> <remote> <branch>';
+exports.command = 'branch <service> <branch>';
 
-exports.describe = 'Checkout a new repository branch';
+exports.describe = 'Checkout a service to a different branch';
 
 exports.builder = {};
 
 exports.branchTasks = {
-  checkoutTemplateBranch,
-  updateTemplateDependencies,
+  checkoutServiceBranch,
 };
 
 /**
  * Command execution handler.
  *
  * @typedef  {Object}  BranchOpts Branch command options
- * @property {string}        name name of the template
- * @property {string}      remote name of the upstream remote
- * @property {string}      branch name of the target branch
+ * @property {string}     service name of the service
+ * @property {string}      branch branch to checkout
  * @property {boolean}    verbose global _verbose_ option
  *
  * @param {BranchOpts} opts branch command options
  */
 exports.handler = (opts) => {
 
-  const { name, remote, branch, verbose } = opts;
+  const { service, branch, verbose } = opts;
 
   const tasks = new Listr([
-    checkoutTemplateBranch(`Checkout ${name} to ${branch}`, name, remote, branch, verbose),
-    updateTemplateDependencies(`Update ${name} associated dependencies`, name, verbose)
+    checkoutServiceBranch(`Checkout ${service} to ${branch}`, service, branch, verbose),
   ], {
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
     collapse: false,
