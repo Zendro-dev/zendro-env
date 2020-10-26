@@ -16,6 +16,7 @@ const {
   resetEnvironment,
 } = require('../handlers/setup');
 const {
+  checkoutBranch,
   cloneStaged,
   cloneRepository,
 } = require('../handlers/git');
@@ -139,8 +140,14 @@ const setupServices = (title, verbose) => {
 
           try {
 
+            // Force repository cache to checkout the target branch
+            if (!template.source) {
+              observer.next(`checkout ${template.branch}`);
+              await checkoutBranch(cwd, template.path, service.branch, verbose);
+            }
+
             observer.next(`removing ${service.name}`);
-            await resetEnvironment(cwd, service.path);
+            await resetEnvironment(cwd, service.path, false);
 
             observer.next(`cloning from ${template.path}`);
             await cloneRepository(cwd, {
