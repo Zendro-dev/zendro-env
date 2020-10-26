@@ -82,7 +82,7 @@ const setupTemplates = (title, verbose) => {
             }
 
             if (!template.source && template.installed) {
-              task.skip('Repository already in cache, use "cache --update" to refresh');
+              task.skip('Repository already in cache, use "setup --update" to refresh');
               observer.complete();
             }
 
