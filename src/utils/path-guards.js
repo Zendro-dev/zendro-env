@@ -11,7 +11,7 @@ exports.isRemote = function (input) {
   /**
    * Match against common git repository patterns
    */
-  const sshRemote = input.match(/^git@\w+.com:[\w-]+\/[\w-]+.git/) !== null;
+  const sshRemote = input.match(/^git@\w+.com:[\w-]+\/[\w-]+.git$/) !== null;
 
   /**
    * Attempt to parse the input as a valid URL
