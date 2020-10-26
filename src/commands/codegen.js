@@ -62,7 +62,7 @@ const resetServices = async (title, verbose) => {
             catch (error) {
               if (error.code === 'ENOENT')
                 task.skip('Service is not installed');
-              observer.error(error.message);
+              observer.error(error);
             }
 
             if (template.source) {
@@ -141,7 +141,7 @@ const generateServicesCode = async (title, verbose) => {
             observer.complete();
           }
           catch (error) {
-            observer.error(error.message);
+            observer.error(error);
           }
           observer.complete();
 
@@ -194,7 +194,7 @@ const applyPatches = (title, verbose) => {
             applyPatch(cwd, patch.path, target, options, verbose);
           }
           catch (error) {
-            observer.error(error.message);
+            observer.error(error);
           }
 
           observer.complete();

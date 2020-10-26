@@ -79,7 +79,7 @@ const destroyWorkspaces = (title) => {
         await resetEnvironment(cwd, 'yarn.lock', false);
       }
       catch (error) {
-        observer.error(error.message);
+        observer.error(error);
       }
       observer.complete();
 
