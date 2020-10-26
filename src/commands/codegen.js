@@ -7,21 +7,20 @@ const { getConfig } = require('../config/config');
 const {
   checkWorkspace,
   composeOptionsString,
-  expandPath,
-  getPackageMain,
+  parseService,
+  parseTemplate,
+  servicePath,
 } = require('../config/helpers');
 
 const {
   cleanRepository,
+  cloneStaged,
   resetRepository,
 } = require('../handlers/git');
 const {
   applyPatch,
   generateCode,
 } = require('../handlers/codegen');
-const {
-  cloneStaged
-} = require('../handlers/setup');
 
 const { isFalsy } = require('../utils/type-guards');
 
@@ -30,40 +29,34 @@ const { isFalsy } = require('../utils/type-guards');
 
 /**
  * Restores services repositories to their original state.
- * @param {string}           title task title
- * @param {string}             cwd path to working directory
- * @param {Service[]}     services list of services
- * @param {boolean}        verbose global _verbose_option
- * @param {() => boolean}  enabled whether the task is enabled
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_option
  */
 const resetServices = async (title, verbose) => {
 
-  const { cwd, services, templates } = getConfig();
-
+  const { cwd, services } = getConfig();
 
   return {
 
     title,
 
     task: () => new Listr(
-      services.map(service => {
-
-        const servicePath = expandPath(service.name);
-        const templatePath = expandPath(service.template);
-        const template = templates.find(t => t.name === service.template);
+      services.map(serviceJson => {
 
         return {
 
-          title: service.name,
+          title: serviceJson.name,
 
           task: (ctx, task) => new Observable(async observer => {
 
+            const { template, ...service } = await parseService(serviceJson);
+
             try {
               observer.next('Resetting repository to its current HEAD');
-              await resetRepository(cwd, servicePath, null, null, verbose);
+              await resetRepository(cwd, service.path, null, verbose);
 
               observer.next('Removing untracked files');
-              await cleanRepository(cwd, servicePath, verbose);
+              await cleanRepository(cwd, service.path, verbose);
 
             }
             catch (error) {
@@ -74,7 +67,7 @@ const resetServices = async (title, verbose) => {
 
             if (template.source) {
               observer.next('Applying staged source changes');
-              await cloneStaged(cwd, templatePath, servicePath, verbose);
+              await cloneStaged(cwd, template.path, service.path, verbose);
             }
 
             observer.complete();
@@ -98,59 +91,75 @@ const resetServices = async (title, verbose) => {
 
 /**
  * Generate code for all services.
- * @param {string}            title task title
- * @param {string}              cwd path to working directory
- * @param {Model[]}          models list of models
- * @param {Service[]}      services list of services
- * @param {Template[]}    templates list of templates
- * @param {boolean}         verbose global _verbose_ option
- * @param {() => boolean}   enabled enabler function
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_ option
  */
-const generateServicesCode = (title, verbose) => {
+const generateServicesCode = async (title, verbose) => {
 
-  const { cwd, models } = getConfig();
+  const { cwd, models, services } = getConfig();
+
+  /** @type {import('listr').ListrTask[]} */
+  const tasks = [];
+
+  for (const modelJson of models) {
+
+    const options = composeOptionsString(modelJson.options);
+
+    for (const serviceName of modelJson.targets) {
+
+      tasks.push({
+        title: serviceName,
+        task: (ctx, task) => new Observable(async observer => {
+
+          try {
+
+            const serviceJson = services.find(service => service.name === serviceName);
+
+            if (!serviceJson) {
+              observer.error(new Error(`service ${serviceName} not found`));
+              observer.complete();
+            }
+
+            const service = await parseService(serviceJson);
+
+            const codegen = await parseTemplate(modelJson.codegen);
+            if (!codegen.installed) {
+              observer.error(new Error(`codegen ${codegen.path} is not installed`));
+              observer.complete();
+            }
+
+            try {
+              observer.next(`Generating code for ${service}`);
+              await generateCode(
+                cwd, codegen.main, modelJson.path, service.path, options, verbose
+              );
+            }
+            catch (error) {
+              observer.error(error);
+            }
+
+            observer.complete();
+          }
+          catch (error) {
+            observer.error(error.message);
+          }
+          observer.complete();
+
+        })
+
+      });
+
+    }
+
+  }
 
   return {
 
     title,
 
-    task: () => new Listr(
-      models.reduce((acc, model) => {
-
-        const codegen = getPackageMain(model.codegen);
-        const options = composeOptionsString(model.options);
-
-        model.target.forEach(targetService => {
-
-          const servicePath = expandPath(targetService);
-
-          acc.push({
-            title: targetService,
-            task: () => new Observable(async observer => {
-
-              try {
-                observer.next(`Generating code for ${targetService}`);
-                await generateCode(cwd, await codegen, model.path, servicePath, options, verbose);
-              }
-              catch (error) {
-                observer.next(error.message);
-                observer.error(error);
-              }
-
-              observer.complete();
-
-            })
-          });
-
-        });
-
-        return acc;
-
-      }, []),
-      {
-        concurrent: !verbose,
-      }
-    ),
+    task: () => new Listr(tasks, {
+      concurrent: !verbose,
+    }),
 
     skip: () => isFalsy(models) && 'No models have been configured',
 
@@ -159,11 +168,8 @@ const generateServicesCode = (title, verbose) => {
 
 /**
  * Apply patches to their target services.
- * @param {string}          title task title
- * @param {string}            cwd path to working directory
- * @param {Patch[]}       patches list of patches
- * @param {boolean}       verbose global _verbose_ option
- * @param {() => boolean} enabled enabler function
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_ option
  */
 const applyPatches = (title, verbose) => {
 
@@ -174,16 +180,27 @@ const applyPatches = (title, verbose) => {
     title,
 
     task: () => new Listr(
-      patches.map(patch => {
+      patches.map(patch => ({
+        title: patch.path,
+        task: () => new Observable(observer => {
 
-        const target  = expandPath(patch.target);
-        const options = patch.options ? composeOptionsString(patch.options) : '';
+          const target = servicePath(patch.target);
+          if (!target) {
+            observer.error(new Error(`could not find service "${patch.target}"`));
+          }
 
-        return {
-          title: patch.path,
-          task: () => applyPatch(cwd, patch.path, target, options, verbose),
-        };
-      })
+          try {
+            const options = patch.options ? composeOptionsString(patch.options) : '';
+            applyPatch(cwd, patch.path, target, options, verbose);
+          }
+          catch (error) {
+            observer.error(error.message);
+          }
+
+          observer.complete();
+
+        })}
+      ))
     ),
 
     skip: () => isFalsy(patches) && 'No patches are configured',
@@ -248,9 +265,9 @@ exports.handler = async (opts) => {
   if (clean || code || defaultRun) tasks.add( await resetServices('Reset services', verbose) );
 
   // --code
-  if (code || defaultRun) tasks.add( generateServicesCode('Generate code', verbose) );
+  if (code || defaultRun) tasks.add( await generateServicesCode('Generate code', verbose) );
 
-  // --patch
+  // // --patch
   if (patch || defaultRun) tasks.add( applyPatches('Apply patches', verbose) );
 
 
