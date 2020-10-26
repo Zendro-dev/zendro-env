@@ -168,3 +168,19 @@ exports.getModuleMain = async function (path) {
     ? join(modulePath, main)
     : undefined;
 };
+
+/**
+ * Get a list of unique cache template names.
+ */
+exports.getTemplates = function () {
+
+  const { models, services } = getConfig();
+
+  /** @type {Set<string>} */
+  const templateSet = new Set();
+
+  services.forEach(service =>  templateSet.add(service.template));
+  models.forEach(model => templateSet.add(model.codegen));
+
+  return Array.from(templateSet);
+};

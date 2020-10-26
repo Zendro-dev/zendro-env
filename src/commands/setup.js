@@ -4,21 +4,26 @@ const UpdaterRenderer = require('listr-update-renderer');
 const { Observable }  = require('rxjs');
 
 const { getConfig } = require('../config/config');
+
 const {
   checkWorkspace,
   parseService,
   parseTemplate,
+  getTemplates,
 } = require('../config/helpers');
+
 const {
   installModules,
   makeEnvPackage,
   renamePackageJson,
   resetEnvironment,
 } = require('../handlers/setup');
+
 const {
   checkoutBranch,
   cloneStaged,
   cloneRepository,
+  fetchAll,
 } = require('../handlers/git');
 
 const { isFalsy } = require('../utils/type-guards');
@@ -50,16 +55,12 @@ const createWorkspace = async (title) => {
  */
 const setupTemplates = (title, verbose) => {
 
-  const { cwd, services, models } = getConfig();
+  const { cwd, services } = getConfig();
 
   if (isFalsy(services))
     throw new Error('Services are not configured');
 
-  // Get an array of unique template addresses
-  const templateSet = new Set();
-  services.forEach(service =>  templateSet.add(service.template));
-  models.forEach(model => templateSet.add(model.codegen));
-  const templates = Array.from(templateSet);
+  const templates = getTemplates();
 
   return {
     title,
@@ -189,7 +190,6 @@ const setupServices = (title, verbose) => {
  * Create `yarn workspaces` and install node modules.
  * @param {string}        title task title
  * @param {boolean}     verbose global _verbose_ option
- * @param {()=>boolean} enabled task enabler
  */
 const setupModules = (title, verbose) => ({
   title,
@@ -238,6 +238,52 @@ const setupModules = (title, verbose) => ({
   }
 });
 
+const updateCache = (title, verbose) => {
+
+  const { cwd } = getConfig();
+  const templates = getTemplates();
+
+  return ({
+    title,
+    task: () => new Listr(
+      templates.map(templateName => ({
+
+        title: templateName,
+
+        task: (ctx, task) => new Observable(async observer => {
+
+          const template = await parseTemplate(templateName);
+
+          if (template.source) {
+            task.skip('source repositories are managed manually');
+          }
+
+          else if (!template.installed) {
+            task.skip(`repository ${template.name} not installed in cache`);
+          }
+
+          else {
+
+            try {
+              observer.next('fetching latest changes from remote');
+              await fetchAll(cwd, template.path, verbose);
+            }
+            catch (error) {
+              observer.error(error);
+            }
+          }
+
+          observer.complete();
+
+        })
+
+      })), {
+        concurrent: !verbose,
+      }
+    )
+  });
+};
+
 /* COMMAND */
 
 exports.command = 'setup';
@@ -252,6 +298,11 @@ exports.builder = {
   },
   services: {
     describe: 'Setup configured services',
+    group: 'Setup',
+    type: 'boolean',
+  },
+  update: {
+    describe: 'Update remotes in the internal cache',
     group: 'Setup',
     type: 'boolean',
   }
@@ -276,9 +327,9 @@ exports.setupTasks = {
  */
 exports.handler = async (opts) => {
 
-  const { modules, services, verbose } = opts;
+  const { modules, services, update, verbose } = opts;
 
-  const defaultRun = !modules && !services;
+  const defaultRun = !modules && !services && !update;
 
   const tasks = new Listr({
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
@@ -287,8 +338,14 @@ exports.handler = async (opts) => {
 
   tasks.add( await createWorkspace('Create workspace') );
 
+  // always check the cache
   if (defaultRun) tasks.add(
     setupTemplates('Check repository cache', verbose)
+  );
+
+  // --update
+  if (update) tasks.add(
+    updateCache('Update repository cache', verbose)
   );
 
   // --services
