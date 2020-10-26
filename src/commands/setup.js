@@ -49,18 +49,16 @@ const createWorkspace = async (title) => {
  */
 const setupTemplates = (title, verbose) => {
 
-  const { cwd, services } = getConfig();
+  const { cwd, services, models } = getConfig();
 
   if (isFalsy(services))
     throw new Error('Services are not configured');
 
   // Get an array of unique template addresses
-  const templates = Array
-    .from(
-      new Set(
-        services.map(service => service.template)
-      )
-    );
+  const templateSet = new Set();
+  services.forEach(service =>  templateSet.add(service.template));
+  models.forEach(model => templateSet.add(model.codegen));
+  const templates = Array.from(templateSet);
 
   return {
     title,
