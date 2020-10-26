@@ -117,16 +117,11 @@ exports.fetchAll = async function (cwd, path, verbose) {
  * @param {string}   branch target branch
  * @param {boolean} verbose global _verbose_ option
  */
-exports.resetRepository = async function (cwd, path, remote, branch, verbose) {
+exports.resetRepository = async function (cwd, path, branch, verbose) {
 
   const repository = join(cwd, path);
 
-  const upstream = remote && branch
-    ? `${remote}/${branch}`
-    : '';
-
-
-  await command(`git reset --hard ${upstream}`, {
+  await command(`git reset --hard ${branch || ''}`, {
     cwd: repository,
     stdio: verbose ? 'inherit' : 'pipe',
   });
