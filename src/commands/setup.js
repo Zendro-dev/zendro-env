@@ -135,29 +135,29 @@ const setupServices = (title, verbose) => {
 
         task: () => new Observable(async observer => {
 
-          const { branch, name, path, template } = await parseService(serviceJson);
+          const { template, ...service } = await parseService(serviceJson);
 
           try {
 
-            observer.next(`removing ${name}`);
-            await resetEnvironment(cwd, path);
+            observer.next(`removing ${service.name}`);
+            await resetEnvironment(cwd, service.path);
 
             observer.next(`cloning from ${template.path}`);
             await cloneRepository(cwd, {
-              branch: branch,
+              branch: template.source ? null : service.branch,
               source: template.path,
-              output: path,
+              output: service.path,
               verbose,
             });
 
             if (template.source) {
 
               observer.next('patching staged changes');
-              await cloneStaged(cwd, template.path, path, verbose);
+              await cloneStaged(cwd, template.path, service.path, verbose);
             }
 
-            observer.next(`renaming ${name} package.json`);
-            await renamePackageJson(cwd, path);
+            observer.next(`renaming ${service.name} package.json`);
+            await renamePackageJson(cwd, service.path);
 
           }
           catch (error) {
