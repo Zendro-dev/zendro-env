@@ -90,10 +90,11 @@ exports.handler = async (opts) => {
 
     await setupTasks.createWorkspace('Create workspace'),
     setupTasks.setupTemplates('Set up templates', opts.v),
+    setupTasks.updateCache('Updating cache', opts.v),
     setupTasks.setupServices('Set up service instances', opts.v),
     setupTasks.setupModules('Install yarn workspace', opts.v),
 
-    codegenTasks.generateServicesCode('Generate code', opts.v),
+    await codegenTasks.generateServicesCode('Generate code', opts.v),
     codegenTasks.applyPatches('Apply patches', opts.v),
 
     dockerTasks.upDockerContainers('Start docker containers', opts.v),
@@ -114,14 +115,14 @@ exports.handler = async (opts) => {
   if (opts.g) tasks.add([
     dockerTasks.downDockerContainers('Stop docker containers', opts.v),
     await codegenTasks.resetServices('Remove generated code', opts.v),
-    codegenTasks.generateServicesCode('Generate code', opts.v),
+    await codegenTasks.generateServicesCode('Generate code', opts.v),
     codegenTasks.applyPatches('Apply patches', opts.v),
   ]);
 
   if (opts.T) tasks.add([
     dockerTasks.downDockerContainers('Stop docker containers', opts.v),
     await codegenTasks.resetServices('Remove generated code', opts.v),
-    codegenTasks.generateServicesCode('Generate code', opts.v),
+    await codegenTasks.generateServicesCode('Generate code', opts.v),
     dockerTasks.upDockerContainers('Start docker containers', opts.v),
     dockerTasks.checkDockerServiceConnections('Check service connections', opts.v),
   ]);
