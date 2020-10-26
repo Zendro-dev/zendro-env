@@ -120,6 +120,7 @@ exports.builder = {
 exports.destroyTasks = {
   destroyDockerEnv,
   destroyWorkEnv,
+  destroyWorkspaces,
 };
 
 /**

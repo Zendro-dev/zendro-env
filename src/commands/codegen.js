@@ -28,65 +28,44 @@ const { isFalsy } = require('../utils/type-guards');
 /* TASKS */
 
 /**
- * Restores services repositories to their original state.
+ * Apply patches to their target services.
  * @param {string}    title task title
- * @param {boolean} verbose global _verbose_option
+ * @param {boolean} verbose global _verbose_ option
  */
-const resetServices = async (title, verbose) => {
+const applyPatches = (title, verbose) => {
 
-  const { cwd, services } = getConfig();
+  const { cwd, patches } = getConfig();
 
   return {
 
     title,
 
     task: () => new Listr(
-      services.map(serviceJson => {
+      patches.map(patch => ({
+        title: patch.path,
+        task: () => new Observable(observer => {
 
-        return {
+          const target = servicePath(patch.target);
+          if (!target) {
+            observer.error(new Error(`could not find service "${patch.target}"`));
+          }
 
-          title: serviceJson.name,
+          try {
+            const options = patch.options ? composeOptionsString(patch.options) : '';
+            applyPatch(cwd, patch.path, target, options, verbose);
+          }
+          catch (error) {
+            observer.error(error);
+          }
 
-          task: (ctx, task) => new Observable(async observer => {
+          observer.complete();
 
-            const { template, ...service } = await parseService(serviceJson);
-
-            try {
-              observer.next('Resetting repository to its current HEAD');
-              await resetRepository(cwd, service.path, null, verbose);
-
-              observer.next('Removing untracked files');
-              await cleanRepository(cwd, service.path, verbose);
-
-            }
-            catch (error) {
-              if (error.code === 'ENOENT')
-                task.skip('Service is not installed');
-              observer.error(error);
-            }
-
-            if (template.source) {
-              observer.next('Applying staged source changes');
-              await cloneStaged(cwd, template.path, service.path, verbose);
-            }
-
-            observer.complete();
-
-          })
-
-        };
-      }),
-      {
-        concurrent: !verbose,
-      }
+        })}
+      ))
     ),
 
-    skip: async () => {
-      const exists = await checkWorkspace(cwd);
-      return !exists.services && 'No services are installed';
-    }
+    skip: () => isFalsy(patches) && 'No patches are configured',
   };
-
 };
 
 /**
@@ -167,44 +146,65 @@ const generateServicesCode = async (title, verbose) => {
 };
 
 /**
- * Apply patches to their target services.
+ * Restores services repositories to their original state.
  * @param {string}    title task title
- * @param {boolean} verbose global _verbose_ option
+ * @param {boolean} verbose global _verbose_option
  */
-const applyPatches = (title, verbose) => {
+const resetServices = async (title, verbose) => {
 
-  const { cwd, patches } = getConfig();
+  const { cwd, services } = getConfig();
 
   return {
 
     title,
 
     task: () => new Listr(
-      patches.map(patch => ({
-        title: patch.path,
-        task: () => new Observable(observer => {
+      services.map(serviceJson => {
 
-          const target = servicePath(patch.target);
-          if (!target) {
-            observer.error(new Error(`could not find service "${patch.target}"`));
-          }
+        return {
 
-          try {
-            const options = patch.options ? composeOptionsString(patch.options) : '';
-            applyPatch(cwd, patch.path, target, options, verbose);
-          }
-          catch (error) {
-            observer.error(error);
-          }
+          title: serviceJson.name,
 
-          observer.complete();
+          task: (ctx, task) => new Observable(async observer => {
 
-        })}
-      ))
+            const { template, ...service } = await parseService(serviceJson);
+
+            try {
+              observer.next('Resetting repository to its current HEAD');
+              await resetRepository(cwd, service.path, null, verbose);
+
+              observer.next('Removing untracked files');
+              await cleanRepository(cwd, service.path, verbose);
+
+            }
+            catch (error) {
+              if (error.code === 'ENOENT')
+                task.skip('Service is not installed');
+              observer.error(error);
+            }
+
+            if (template.source) {
+              observer.next('Applying staged source changes');
+              await cloneStaged(cwd, template.path, service.path, verbose);
+            }
+
+            observer.complete();
+
+          })
+
+        };
+      }),
+      {
+        concurrent: !verbose,
+      }
     ),
 
-    skip: () => isFalsy(patches) && 'No patches are configured',
+    skip: async () => {
+      const exists = await checkWorkspace(cwd);
+      return !exists.services && 'No services are installed';
+    }
   };
+
 };
 
 

@@ -313,6 +313,7 @@ exports.setupTasks = {
   setupModules,
   setupServices,
   setupTemplates,
+  updateCache,
 };
 
 /**
