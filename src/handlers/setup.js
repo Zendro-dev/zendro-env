@@ -37,7 +37,6 @@ exports.makeEnvPackage = async function (cwd, packages) {
 
   const packageJson = JSON.stringify({
     private: true,
-    name: parse(cwd).base,
     workspaces: packages,
   }, null, 2);
 
