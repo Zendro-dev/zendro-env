@@ -81,22 +81,24 @@ const setupTemplates = (title, verbose) => {
               observer.complete();
             }
 
-            if (!template.source && template.installed) {
+            else if (!template.source && template.installed) {
               task.skip('Repository already in cache, use "setup --update" to refresh');
               observer.complete();
             }
 
-            if (template.source && !template.installed) {
+            else if (template.source && !template.installed) {
               observer.error(new Error('Source repository does not exist'));
               observer.complete();
             }
 
-            observer.next(`cloning ${repository}`);
-            await cloneRepository(cwd, {
-              source: repository,
-              output: template.path,
-              verbose,
-            });
+            else {
+              observer.next(`cloning ${repository}`);
+              await cloneRepository(cwd, {
+                source: repository,
+                output: template.path,
+                verbose,
+              });
+            }
 
           }
           catch (error) {
@@ -238,6 +240,11 @@ const setupModules = (title, verbose) => ({
   }
 });
 
+/**
+ * Update the internal repository cache with the latest remote changes.
+ * @param {string} title task title
+ * @param {boolean} verbose global _verbose_ option
+ */
 const updateCache = (title, verbose) => {
 
   const { cwd } = getConfig();
