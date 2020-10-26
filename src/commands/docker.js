@@ -153,6 +153,7 @@ exports.builder = {
 };
 
 exports.dockerTasks = {
+  buildDockerImages,
   checkDockerServiceConnections,
   downDockerContainers,
   upDockerContainers,

@@ -4,18 +4,27 @@ const UpdaterRenderer = require('listr-update-renderer');
 const { Observable }  = require('rxjs');
 
 const { getConfig } = require('../config/config');
+
 const {
   checkWorkspace,
-  expandPath
+  parseService,
+  parseTemplate,
+  getTemplates,
 } = require('../config/helpers');
+
 const {
-  cloneTemplate,
-  cloneService,
-  cloneStaged,
   installModules,
+  makeEnvPackage,
   renamePackageJson,
   resetEnvironment,
 } = require('../handlers/setup');
+
+const {
+  checkoutBranch,
+  cloneStaged,
+  cloneRepository,
+  fetchAll,
+} = require('../handlers/git');
 
 const { isFalsy } = require('../utils/type-guards');
 
@@ -40,57 +49,67 @@ const createWorkspace = async (title) => {
 };
 
 /**
- * Re-generate upstream templates.
+ * Verify cache.
  * @param {string}    title task title
  * @param {boolean} verbose global _verbose_ option
  */
 const setupTemplates = (title, verbose) => {
 
-  const { cwd, templates } = getConfig();
+  const { cwd, services } = getConfig();
 
-  if (isFalsy(templates))
-    throw new Error('Templates property is not configured');
+  if (isFalsy(services))
+    throw new Error('Services are not configured');
+
+  const templates = getTemplates();
 
   return {
     title,
     task: () => new Listr(
-      templates.map(template => {
+      templates.map(repository => ({
 
-        const { branch, name, source, url } = template;
-        const dest = expandPath(name);
+        title: repository,
 
-        return {
+        task: (ctx, task) => new Observable(async observer => {
 
-          title: name,
+          try {
 
-          task: () => new Observable(async observer => {
+            observer.next('checking cache');
+            const template = await parseTemplate(repository);
 
-            try {
-
-              observer.next(`Removing ${name}`);
-              await resetEnvironment(cwd, dest);
-
-              observer.next(`cloning ${url}`);
-              await cloneTemplate(cwd, branch, url, dest, verbose);
-
-            }
-            catch (error) {
-
-              if (verbose)
-                observer.next(error.message);
-              observer.error(error);
-
+            if (template.source && template.installed) {
+              task.skip('Source repositories are managed manually');
+              observer.complete();
             }
 
-            observer.complete();
-          }),
+            if (!template.source && template.installed) {
+              task.skip('Repository already in cache, use "setup --update" to refresh');
+              observer.complete();
+            }
 
-          skip: () => source
-            ? `Using ${name} as source.`
-            : false
+            if (template.source && !template.installed) {
+              observer.error(new Error('Source repository does not exist'));
+              observer.complete();
+            }
 
-        };
-      }), {
+            observer.next(`cloning ${repository}`);
+            await cloneRepository(cwd, {
+              source: repository,
+              output: template.path,
+              verbose,
+            });
+
+          }
+          catch (error) {
+
+            if (verbose) observer.next(error.message);
+            observer.error(error);
+
+          }
+
+          observer.complete();
+        }),
+
+      })), {
         concurrent: !verbose,
       },
     )
@@ -104,10 +123,7 @@ const setupTemplates = (title, verbose) => {
  */
 const setupServices = (title, verbose) => {
 
-  const { cwd, services, templates } = getConfig();
-
-  if (isFalsy(templates))
-    throw new Error('Templates must be configured to setup services');
+  const { cwd, services } = getConfig();
 
   if (isFalsy(services))
     throw new Error('Services must be configured to setup services');
@@ -115,47 +131,55 @@ const setupServices = (title, verbose) => {
   return {
     title,
     task: () => new Listr(
-      services.map(service => {
+      services.map(serviceJson => ({
 
-        const template = templates.find(t => t.name === service.template);
-        const templatePath = expandPath(service.template);
-        const servicePath  = expandPath(service.name);
+        title: serviceJson.name,
 
-        return {
-          title: service.name,
-          task: () => new Observable(async observer => {
+        task: () => new Observable(async observer => {
 
-            try {
+          const { template, ...service } = await parseService(serviceJson);
 
-              observer.next(`Removing ${service.name}`);
-              await resetEnvironment(cwd, servicePath);
+          try {
 
-              observer.next(`cloning ${templatePath}`);
-              await cloneService(cwd, templatePath, servicePath);
-
-              if (template.source) {
-
-                observer.next('patching staged changes');
-                await cloneStaged(cwd, templatePath, servicePath, verbose);
-              }
-
-              observer.next(`renaming ${servicePath} package.json`);
-              await renamePackageJson(cwd, servicePath);
-
-            }
-            catch (error) {
-
-              if (verbose)
-                observer.next(error.message);
-              observer.error(error);
-
+            // Force repository cache to checkout the target branch
+            if (!template.source) {
+              observer.next(`checkout ${template.branch}`);
+              await checkoutBranch(cwd, template.path, service.branch, verbose);
             }
 
-            observer.complete();
-          })
-        };
+            observer.next(`removing ${service.name}`);
+            await resetEnvironment(cwd, service.path, false);
 
-      }), {
+            observer.next(`cloning from ${template.path}`);
+            await cloneRepository(cwd, {
+              branch: template.source ? null : service.branch,
+              source: template.path,
+              output: service.path,
+              verbose,
+            });
+
+            if (template.source) {
+
+              observer.next('patching staged changes');
+              await cloneStaged(cwd, template.path, service.path, verbose);
+            }
+
+            observer.next(`renaming ${service.name} package.json`);
+            await renamePackageJson(cwd, service.path);
+
+          }
+          catch (error) {
+
+            if (verbose)
+              observer.next(error.message);
+            observer.error(error);
+
+          }
+
+          observer.complete();
+        })
+
+      })), {
         concurrent: !verbose,
       }
     )
@@ -166,35 +190,98 @@ const setupServices = (title, verbose) => {
  * Create `yarn workspaces` and install node modules.
  * @param {string}        title task title
  * @param {boolean}     verbose global _verbose_ option
- * @param {()=>boolean} enabled task enabler
  */
-const setupModules = (title, verbose) => {
+const setupModules = (title, verbose) => ({
+  title,
+  task: () => new Observable(async observer => {
+
+    const { cwd, services } = getConfig();
+
+    try {
+
+      observer.next('reading packages');
+      const packages = await services.reduce(
+        async (asyncSet, serviceJson) => {
+
+          const { path, template } = await parseService(serviceJson);
+
+          const pkgs = await asyncSet;
+
+          pkgs.add(path);
+          if (!template.source)
+            pkgs.add(template.path);
+
+          return pkgs;
+
+        },
+        Promise.resolve(new Set()),
+      )
+ ;
+      observer.next('creating environment package');
+      await makeEnvPackage(cwd, Array.from(packages));
+
+      observer.next(`installing node_modules in ${cwd}`);
+      await installModules(cwd, verbose);
+    }
+    catch (error) {
+      if (verbose)
+        observer.next(error.message);
+      observer.error(error);
+    }
+
+    observer.complete();
+
+  }),
+  skip: async () => {
+    const { cache, services } = await checkWorkspace();
+    return !( cache || services) && 'Neither cache nor services exist in the workspace';
+  }
+});
+
+const updateCache = (title, verbose) => {
 
   const { cwd } = getConfig();
+  const templates = getTemplates();
 
-  return {
+  return ({
     title,
-    task: () => new Observable(async observer => {
+    task: () => new Listr(
+      templates.map(templateName => ({
 
-      try {
-        observer.next(`Installing node_modules in ${cwd}`);
-        await installModules(cwd, verbose);
+        title: templateName,
+
+        task: (ctx, task) => new Observable(async observer => {
+
+          const template = await parseTemplate(templateName);
+
+          if (template.source) {
+            task.skip('source repositories are managed manually');
+          }
+
+          else if (!template.installed) {
+            task.skip(`repository ${template.name} not installed in cache`);
+          }
+
+          else {
+
+            try {
+              observer.next('fetching latest changes from remote');
+              await fetchAll(cwd, template.path, verbose);
+            }
+            catch (error) {
+              observer.error(error);
+            }
+          }
+
+          observer.complete();
+
+        })
+
+      })), {
+        concurrent: !verbose,
       }
-      catch (error) {
-        if (verbose)
-          observer.next(error.message);
-        observer.error(error);
-      }
-
-      observer.complete();
-
-    }),
-    skip: async () => {
-      const { services, templates } = await checkWorkspace();
-      return !(templates || services) && 'Neither services nor templates exist in the workspace';
-    }
-  };
-
+    )
+  });
 };
 
 /* COMMAND */
@@ -204,21 +291,21 @@ exports.command = 'setup';
 exports.describe = 'Setup a testing environment workspace.';
 
 exports.builder = {
-  install: {
-    describe: 'Install modules (requires instances)',
+  modules: {
+    describe: 'Install node modules',
     group: 'Setup',
     type: 'boolean',
   },
-  service: {
-    describe: 'Clone instances in config file (requires templates)',
+  services: {
+    describe: 'Setup configured services',
     group: 'Setup',
     type: 'boolean',
   },
-  template: {
-    describe: 'Clone templates in the config file',
+  update: {
+    describe: 'Update remotes in the internal cache',
     group: 'Setup',
     type: 'boolean',
-  },
+  }
 };
 
 exports.setupTasks = {
@@ -226,24 +313,24 @@ exports.setupTasks = {
   setupModules,
   setupServices,
   setupTemplates,
+  updateCache,
 };
 
 /**
  * Command execution handler.
  *
  * @typedef  {Object} SetupOpts Setup command options.
- * @property {boolean}  install install modules (requires instances)
- * @property {boolean}  service clone services (requires templates)
- * @property {boolean} template clone templates
+ * @property {boolean}  modules install node modules
+ * @property {boolean} services clone services
  * @property {boolean}  verbose global _verbose_ option
  *
  * @param {SetupOpts} opts setup command options
  */
 exports.handler = async (opts) => {
 
-  const { install, template, service, verbose } = opts;
+  const { modules, services, update, verbose } = opts;
 
-  const defaultRun = !install && !service && !template;
+  const defaultRun = !modules && !services && !update;
 
   const tasks = new Listr({
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
@@ -252,19 +339,24 @@ exports.handler = async (opts) => {
 
   tasks.add( await createWorkspace('Create workspace') );
 
-  // --templates
-  if (template || defaultRun) tasks.add(
-    setupTemplates('Clone templates', verbose)
+  // always check the cache
+  if (defaultRun) tasks.add(
+    setupTemplates('Check repository cache', verbose)
+  );
+
+  // --update
+  if (update) tasks.add(
+    updateCache('Update repository cache', verbose)
   );
 
   // --services
-  if (service || defaultRun) tasks.add(
-    setupServices('Clone services', verbose)
+  if (services || defaultRun) tasks.add(
+    setupServices('Setup services', verbose)
   );
 
   // --modules
-  if (install || defaultRun) tasks.add(
-    setupModules( 'Install yarn workspace', verbose)
+  if (modules || services || defaultRun) tasks.add(
+    setupModules( 'Install node modules', verbose)
   );
 
   tasks.run().catch(error => {
