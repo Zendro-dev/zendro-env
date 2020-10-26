@@ -4,6 +4,7 @@ const UpdaterRenderer      = require('listr-update-renderer');
 const { getConfig }        = require('../config/config');
 const { resetEnvironment } = require('../handlers/setup');
 const { deleteDockerEnv }  = require('../handlers/docker');
+const { Observable }       = require('rxjs');
 
 
 /* TASKS */
@@ -50,6 +51,42 @@ const destroyWorkEnv = (title, folderName) => {
   };
 };
 
+/**
+ * Destroy installed yarn workspace.
+ *
+ * - node_modules
+ * - package.json
+ * - yarn.lock
+ *
+ * @param {string} title task title
+ */
+const destroyWorkspaces = (title) => {
+
+  const { cwd } = getConfig();
+
+  return {
+    title,
+    task: () => new Observable(async observer => {
+
+      try {
+        observer.next('removing node modules');
+        await resetEnvironment(cwd, 'node_modules', false);
+
+        observer.next('removing package.json');
+        await resetEnvironment(cwd, 'package.json', false);
+
+        observer.next('removing yarn.lock');
+        await resetEnvironment(cwd, 'yarn.lock', false);
+      }
+      catch (error) {
+        observer.error(error.message);
+      }
+      observer.complete();
+
+    })
+  };
+};
+
 
 /* COMMAND */
 
@@ -58,7 +95,12 @@ exports.command = 'destroy';
 exports.describe = 'Remove a testing environment.';
 
 exports.builder = {
-  compose: {
+  cache: {
+    describe: 'Delete environment cache',
+    group: 'Destroy',
+    type: 'boolean'
+  },
+  docker: {
     describe: 'Delete docker containers, images, and volumes',
     group: 'Destroy',
     type: 'boolean'
@@ -68,13 +110,8 @@ exports.builder = {
     group: 'Destroy',
     type: 'boolean'
   },
-  service: {
+  services: {
     describe: 'Delete installed services',
-    group: 'Destroy',
-    type: 'boolean'
-  },
-  template: {
-    describe: 'Delete cloned templates',
     group: 'Destroy',
     type: 'boolean'
   },
@@ -89,19 +126,19 @@ exports.destroyTasks = {
  * Destroy command execution handler.
  *
  * @typedef  {Object} DestroyOpts
- * @property {boolean}  compose delete docker-compose containers, images, and volumes
+ * @property {boolean}    cache delete environment cache
+ * @property {boolean}   docker delete docker-compose containers, images, and volumes
  * @property {boolean}  modules delete installed node modules
- * @property {boolean}  service delete cloned services
- * @property {boolean} template delete cloned templates
+ * @property {boolean} services delete cloned services
  * @property {boolean}  verbose global _verbose_ option
  *
  * @param {DestroyOpts} opts setup command options
  */
 exports.handler = (opts) => {
 
-  const { compose, modules, service, template, verbose } = opts;
+  const { cache, docker, modules, services, verbose } = opts;
 
-  const defaultRun = !compose && !service && !template;
+  const defaultRun = !cache && !docker && !services;
 
   const tasks = new Listr({
     collapse: false,
@@ -110,20 +147,20 @@ exports.handler = (opts) => {
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
   });
 
-  if (compose || defaultRun) tasks.add(
+  if (docker || defaultRun) tasks.add(
     destroyDockerEnv('Remove docker containers, images, and volumes', verbose)
   );
 
-  if (service || defaultRun) tasks.add(
-    destroyWorkEnv('Remove all services', 'services', verbose)
-  );
-
-  if (template || defaultRun) tasks.add(
-    destroyWorkEnv('Remove all templates', 'templates', verbose)
+  if (cache || defaultRun) tasks.add(
+    destroyWorkEnv('Remove environment cache', 'cache', verbose)
   );
 
   if (modules || defaultRun) tasks.add(
-    destroyWorkEnv('Remove installed node modules', 'node_modules', verbose)
+    destroyWorkspaces('Remove installed workspace')
+  );
+
+  if (services || defaultRun) tasks.add(
+    destroyWorkEnv('Remove all services', 'services', verbose)
   );
 
   tasks.run().catch(error => {
