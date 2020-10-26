@@ -1,4 +1,4 @@
-const { readFile, stat }            = require('fs/promises');
+const { readFile }                  = require('fs/promises');
 const { join, sep, parse, resolve } = require('path');
 const { getConfig }                 = require('./config');
 const { pathExists, isRemote }      = require('../utils/path-guards');
@@ -127,33 +127,44 @@ exports.parseTemplate = async function (repository) {
    */
   const installed = await pathExists( resolve(cwd, path) );
 
+  /**
+   * Get the path to the repository main entry file.
+   *
+   * - If the template is not installed, main should be "null"
+   * - If the template is installed but main is not defined in package.json,
+   *   main should be "undefined"
+   */
+  const main = installed
+    ? await exports.getModuleMain(path)
+    : null;
+
   return {
     installed,
+    main,
     path,
     source,
   };
 };
 
 /**
- * Get the path to a package main entry file.
- * @param {string} name name of the package
+ * Get the path to a module main entry file as specified in its package.json file.
+ * @param   {string} name path to the module folder
+ * @returns {Promise<string|undefined} path to the main entry file
  */
-exports.getPackageMain = async function (name) {
+exports.getModuleMain = async function (path) {
 
   const { cwd } = getConfig();
 
-  // Path to the service or template package.json
-  const realPath = exports.servicePath(name);
-  const codegenJsonPath = resolve(cwd, join(realPath, 'package.json'));
+  // Read module package.json
+  const modulePath = resolve(cwd, path);
+  const jsonPath   = join(modulePath, 'package.json');
+  const jsonObject = JSON.parse(await readFile(jsonPath));
 
-  const packageJson = JSON.parse(await readFile(codegenJsonPath));
+  // Will be "undefined" if it is not defined in package.json
+  const { main } = jsonObject;
 
-  // Compose path to code-generator main *.js file
-  // Will be "null" if main is not defined in package.json
-  const { main } = packageJson;
-  if (!main) {
-    throw new Error(`Property "main" is not defined in ${name} package.json`);
-  }
-
-  return join(realPath, main);
+  // Return path to main .js file
+  return main
+    ? join(modulePath, main)
+    : undefined;
 };
