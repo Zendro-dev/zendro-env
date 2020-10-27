@@ -1,4 +1,4 @@
-const { stat } = require('fs/promises');
+const { stat } = require('fs').promises;
 
 
 /**

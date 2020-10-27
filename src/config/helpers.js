@@ -1,4 +1,4 @@
-const { readFile }                  = require('fs/promises');
+const { readFile }                  = require('fs').promises;
 const { join, sep, parse, resolve } = require('path');
 const { getConfig }                 = require('./config');
 const { pathExists, isRemote }      = require('../utils/path-guards');

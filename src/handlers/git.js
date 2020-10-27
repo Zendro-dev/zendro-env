@@ -1,5 +1,5 @@
 const { command }              = require('execa');
-const { stat }                 = require('fs/promises');
+const { stat }                 = require('fs').promises;
 const { join, parse, resolve } = require('path');
 
 

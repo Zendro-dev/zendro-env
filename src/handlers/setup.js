@@ -6,7 +6,7 @@ const {
   readFile,
   rmdir,
   writeFile,
-} = require('fs/promises');
+} = require('fs').promises;
 const {
   join,
   parse,
