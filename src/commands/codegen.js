@@ -99,22 +99,18 @@ const generateServicesCode = async (title, verbose) => {
               observer.complete();
             }
 
-            const service = await parseService(serviceJson);
-
             const codegen = await parseTemplate(modelJson.codegen);
             if (!codegen.installed) {
               observer.error(new Error(`codegen ${codegen.path} is not installed`));
               observer.complete();
             }
 
-            try {
-              observer.next(`Generating code for ${service}`);
+            else {
+              const service = await parseService(serviceJson);
+              observer.next(`Generating code for ${service.name}`);
               await generateCode(
                 cwd, codegen.main, modelJson.path, service.path, options, verbose
               );
-            }
-            catch (error) {
-              observer.error(error);
             }
 
             observer.complete();
