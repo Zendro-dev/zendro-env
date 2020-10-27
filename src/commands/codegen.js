@@ -82,7 +82,9 @@ const generateServicesCode = async (title, verbose) => {
 
   for (const modelJson of models) {
 
-    const options = composeOptionsString(modelJson.options);
+    const options = modelJson.options
+      ? composeOptionsString(modelJson.options)
+      : '';
 
     for (const serviceName of modelJson.targets) {
 
