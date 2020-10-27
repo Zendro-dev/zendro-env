@@ -123,6 +123,7 @@ exports.handler = async (opts) => {
     dockerTasks.downDockerContainers('Stop docker containers', opts.v),
     await codegenTasks.resetServices('Remove generated code', opts.v),
     await codegenTasks.generateServicesCode('Generate code', opts.v),
+    codegenTasks.applyPatches('Apply patches', opts.v),
     dockerTasks.upDockerContainers('Start docker containers', opts.v),
     dockerTasks.checkDockerServiceConnections('Check service connections', opts.v),
   ]);
