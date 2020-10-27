@@ -197,12 +197,13 @@ const setupModules = (title, verbose) => ({
   title,
   task: () => new Observable(async observer => {
 
-    const { cwd, services } = getConfig();
+    const { cwd, models, services } = getConfig();
 
     try {
 
-      observer.next('reading packages');
-      const packages = await services.reduce(
+      observer.next('reading service packages');
+
+      const servicePackages = await services.reduce(
         async (asyncSet, serviceJson) => {
 
           const { path, template } = await parseService(serviceJson);
@@ -217,10 +218,27 @@ const setupModules = (title, verbose) => ({
 
         },
         Promise.resolve(new Set()),
-      )
- ;
+      );
+
+      observer.next('reading model packages');
+
+      const modelPackages = await models.reduce(
+        async (asyncSet, modelJson) => {
+
+          const codegen = await parseTemplate(modelJson.codegen);
+
+          const pkgs = await asyncSet;
+          if (!codegen.source)
+            pkgs.add(codegen.path);
+
+          return pkgs;
+
+        },
+        Promise.resolve(new Set()),
+      );
+
       observer.next('creating environment package');
-      await makeEnvPackage(cwd, Array.from(packages));
+      await makeEnvPackage(cwd, Array.from([ ...servicePackages, ...modelPackages ]));
 
       observer.next(`installing node_modules in ${cwd}`);
       await installModules(cwd, verbose);
