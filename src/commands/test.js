@@ -1,19 +1,23 @@
-const { getConfig }   = require('../config/config');
-const { runTest }     = require('../handlers/test');
+const { getConfig } = require('../config/config');
+const { runTest }   = require('../handlers/test');
 
 /* TASKS */
 
 /**
  * Run all or a subset of tests.
- * @param {string}     cwd path to working directory
- * @param {Test[]}   tests list of tests
  * @param {string[]} names list of test names to run
  */
-const runTests = async (cwd, tests, names) => {
+const runTests = async (names) => {
 
+  const { cwd, tests } = getConfig();
   // tests
   //   .filter(test => names === undefined || names.includes(test.name))
   //   .forEach(async test => await runTest(cwd, test, verbose));
+
+  if (!tests) {
+    console.log('No tests have been configured');
+    return;
+  }
 
   for (const test of tests) {
 
@@ -50,9 +54,8 @@ exports.testTasks = {
  */
 exports.handler = async (opts) => {
 
-  const { cwd, tests } = getConfig();
-  const { names }      = opts;
+  const { names } = opts;
 
-  await runTests(cwd, tests, names);
+  await runTests(names);
 
 };

@@ -1,9 +1,11 @@
 const Listr           = require('listr');
 const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
+const { Observable }  = require('rxjs');
 const { getConfig }   = require('../config/config');
 const {
-  checkDockerEnv,
+  buildImages,
+  checkConnection,
   downContainers,
   upContainers,
 } = require('../handlers/docker');
@@ -12,57 +14,112 @@ const {
 /* TASKS */
 
 /**
+ * Rebuild docker images.
+ * @param {string} title task title
+ * @param {boolean} verbose global _verbose_ option
+ */
+const buildDockerImages = (title, verbose) => {
+
+  const { cwd, docker } = getConfig();
+
+  return {
+    title,
+    task: () => buildImages(cwd, docker, verbose),
+  };
+};
+
+/**
  * Checks whether docker services are ready to accept requests.
  * @param {string}          title task title
- * @param {Service[]}    services list of services
  * @param {boolean}       verbose global _verbose_option
- * @param {() => boolean} enabled whether the task is enabled
  */
-const checkDockerServiceConnections = (title, services, verbose, enabled) => ({
-  title,
-  task: () => new Listr(
-    services.map(server => ({
+const checkDockerServiceConnections = (title, verbose) => {
 
-      title: `${server.name}`,
-      task: () => checkDockerEnv(server),
-      skip: () => server.url ? false : 'Service does not have a configured URL'
+  const { promisify } = require('util');
+  const sleep = promisify(setTimeout);
 
-    })),
-    {
-      concurrent: true,
-      exitOnError: false,
-    }
-  ),
-  enabled,
-});
+  const { services } = getConfig();
+
+  return {
+    title,
+    task: () => new Listr(
+      services.map(server => {
+
+        const { name, url } = server;
+
+        return {
+
+          title: `${server.name}`,
+          task: () => new Observable(async observer => {
+
+            observer.next(`Connecting to ${name}`);
+
+            let response;
+            let attempts = 0;
+            const maxAttempts = 10;
+
+            while (!response && attempts <= maxAttempts+1) {
+              try {
+                response = await checkConnection(url);
+              }
+              catch (error) {
+                attempts++;
+                if (attempts > maxAttempts) {
+                  observer.error(error);
+                }
+                else {
+                  await sleep(2000);
+                  observer.next(`Waiting for "${name}" -- attempt ${attempts}/${maxAttempts}`);
+                }
+              }
+            }
+
+            if (response)
+              observer.next(`Connected to ${name} @ ${url}`);
+
+            observer.complete();
+          }),
+          skip: () => !server.url && 'Service does not have a configured URL'
+
+        };
+      }),
+      {
+        concurrent: true,
+        exitOnError: false,
+      }
+    ),
+  };
+};
 
 /**
  * Stop services, remove containers and volumes.
  * @param {string}          title task title
- * @param {string}            cwd path to working directory
- * @param {string}         docker path to docker-compose file
- * @param {boolean}       verbose global _verbose_option
  * @param {() => boolean} enabled whether the task is enabled
  */
-const downDockerContainers = (title, cwd, docker, verbose, enabled) => ({
-  title,
-  task: () => downContainers(cwd, docker, verbose),
-  enabled,
-});
+const downDockerContainers = (title, verbose) => {
+
+  const { cwd, docker } = getConfig();
+
+  return {
+    title,
+    task: () => downContainers(cwd, docker, verbose),
+  };
+};
 
 /**
  * Recreate containers, renew volumes, and remove orphans.
  * @param {string}          title task title
- * @param {string}            cwd path to working directory
- * @param {string}         docker path to docker-compose file
  * @param {boolean}       verbose global _verbose_option
- * @param {() => boolean} enabled whether the task is enabled
  */
-const upDockerContainers = (title, cwd, docker, verbose, enabled) => ({
-  title,
-  task: () => upContainers(cwd, docker, verbose),
-  enabled,
-});
+const upDockerContainers = (title, verbose) => {
+
+  const { cwd, docker } = getConfig();
+
+  return {
+    title,
+    task: () => upContainers(cwd, docker, verbose),
+  };
+};
 
 
 /* COMMAND */
@@ -72,6 +129,11 @@ exports.command = 'docker';
 exports.describe = 'Manage the docker configuration';
 
 exports.builder = {
+  build: {
+    describe: 'Build docker images',
+    group: 'Docker',
+    type: 'boolean',
+  },
   check: {
     describe: 'Check that services are ready to take requests',
     group: 'Docker',
@@ -81,17 +143,17 @@ exports.builder = {
     describe: 'Down docker containers',
     group: 'Docker',
     type: 'boolean',
-    conflicts: 'up',
+    conflicts: [ 'build', 'check', 'up' ],
   },
   up: {
     describe: 'Up docker containers',
     group: 'Docker',
     type: 'boolean',
-    conflicts: 'down',
   },
 };
 
 exports.dockerTasks = {
+  buildDockerImages,
   checkDockerServiceConnections,
   downDockerContainers,
   upDockerContainers,
@@ -110,35 +172,34 @@ exports.dockerTasks = {
  */
 exports.handler = async (opts) => {
 
-  const { cwd, docker, services }    = getConfig();
-  const { check, down, up, verbose } = opts;
+  const { build, check, down, up, verbose } = opts;
 
-  const defaultRun = !check && !down && !up;
+  const defaultRun = !build && !check && !down && !up;
 
-  const tasks = new Listr(
-    [
-      upDockerContainers(
-        `Up ${docker}`,
-        cwd, docker, verbose,
-        () => up || defaultRun
-      ),
-      downDockerContainers(
-        `Down ${docker}`,
-        cwd, docker, verbose,
-        () => down
-      ),
-      checkDockerServiceConnections(
-        'Check service connections',
-        services, verbose,
-        () => check || defaultRun,
-      )
-    ],
-    {
-      renderer: verbose ? VerboseRenderer : UpdaterRenderer,
-      collapse: false,
-    }
+  const tasks = new Listr({
+    renderer: verbose ? VerboseRenderer : UpdaterRenderer,
+    collapse: false,
+  });
+
+  if (build) tasks.add(
+    buildDockerImages('Build docker images', verbose)
   );
 
-  tasks.run().catch(err => { /* console.error */ });
+  if (up || defaultRun) tasks.add(
+    upDockerContainers('Up docker containers', verbose)
+  );
+
+  if (check || defaultRun) tasks.add(
+    checkDockerServiceConnections('Check service connections', verbose)
+  );
+
+  if (down) tasks.add(
+    downDockerContainers('Down docker containers', verbose)
+  );
+
+  tasks.run().catch(error => {
+    console.error(error.message);
+    process.exit(error.errno);
+  });
 
 };

@@ -1,103 +1,209 @@
 const Listr           = require('listr');
 const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
+const { Observable }  = require('rxjs');
 
-const { getConfig }                              = require('../config/config');
-const { applyPatch, generateCode, resetService } = require('../handlers/codegen');
+const { getConfig } = require('../config/config');
+const {
+  checkWorkspace,
+  composeOptionsString,
+  parseService,
+  parseTemplate,
+  servicePath,
+} = require('../config/helpers');
+
+const {
+  cleanRepository,
+  cloneStaged,
+  resetRepository,
+} = require('../handlers/git');
+const {
+  applyPatch,
+  generateCode,
+} = require('../handlers/codegen');
+
+const { isFalsy } = require('../utils/type-guards');
 
 
 /* TASKS */
 
 /**
- * Restores services repositories to their original state.
- * @param {string}           title task title
- * @param {string}             cwd path to working directory
- * @param {Service[]}     services list of services
- * @param {boolean}        verbose global _verbose_option
- * @param {() => boolean}  enabled whether the task is enabled
+ * Apply patches to their target services.
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_ option
  */
-const resetServices = (title, cwd, services, verbose, enabled) => ({
+const applyPatches = (title, verbose) => {
 
-  title,
+  const { cwd, patches } = getConfig();
 
-  task: () => new Listr(
-    services.map(service => ({
-      title: service.name,
-      task: (ctx, task) => resetService(cwd, service, verbose)
-        .catch(error => {
-          if (error.code === 'ENOENT')
-            task.skip('Service is not installed');
-        }),
-    })),
-    {
-      concurrent: !verbose,
-    }
-  ),
+  return {
 
-  enabled,
-});
+    title,
+
+    task: () => new Listr(
+      patches.map(patch => ({
+        title: patch.path,
+        task: () => new Observable(observer => {
+
+          const target = servicePath(patch.target);
+          if (!target) {
+            observer.error(new Error(`could not find service "${patch.target}"`));
+          }
+
+          try {
+            const options = patch.options ? composeOptionsString(patch.options) : '';
+            applyPatch(cwd, patch.path, target, options, verbose);
+          }
+          catch (error) {
+            observer.error(error);
+          }
+
+          observer.complete();
+
+        })}
+      ))
+    ),
+
+    skip: () => isFalsy(patches) && 'No patches are configured',
+  };
+};
 
 /**
  * Generate code for all services.
- * @param {string}            title task title
- * @param {string}              cwd path to working directory
- * @param {Model[]}          models list of models
- * @param {Service[]}      services list of services
- * @param {Template[]}    templates list of templates
- * @param {boolean}         verbose global _verbose_ option
- * @param {() => boolean}   enabled enabler function
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_ option
  */
-const generateServices = (title, cwd, models, services, templates, verbose, enabled) => ({
+const generateServicesCode = async (title, verbose) => {
 
-  title,
+  const { cwd, models, services } = getConfig();
 
-  task: () => new Listr(
-    models.reduce((acc, model) => {
+  /** @type {import('listr').ListrTask[]} */
+  const tasks = [];
 
-      model.target.forEach(targetService => {
+  for (const modelJson of models) {
 
-        const service = services.find(service => service.name === targetService);
-        const codegen = templates.find(({ name }) => name === service.codegen);
+    const options = modelJson.options
+      ? composeOptionsString(modelJson.options)
+      : '';
 
-        acc.push({
-          title: targetService,
-          task: () => generateCode(cwd, model, service, codegen, verbose),
-        });
+    for (const serviceName of modelJson.targets) {
+
+      tasks.push({
+        title: serviceName,
+        task: (ctx, task) => new Observable(async observer => {
+
+          try {
+
+            const serviceJson = services.find(service => service.name === serviceName);
+
+            if (!serviceJson) {
+              observer.error(new Error(`service ${serviceName} not found`));
+              observer.complete();
+            }
+
+            const codegen = await parseTemplate(modelJson.codegen);
+            if (!codegen.installed) {
+              observer.error(new Error(`codegen ${codegen.path} is not installed`));
+              observer.complete();
+            }
+
+            else {
+              const service = await parseService(serviceJson);
+              observer.next(`Generating code for ${service.name}`);
+              await generateCode(
+                cwd, codegen.main, modelJson.path, service.path, options, verbose
+              );
+            }
+
+            observer.complete();
+          }
+          catch (error) {
+            observer.error(error);
+          }
+          observer.complete();
+
+        })
 
       });
 
-      return acc;
-
-    }, []),
-    {
-      concurrent: !verbose,
     }
-  ),
 
-  enabled,
-});
+  }
+
+  return {
+
+    title,
+
+    task: () => new Listr(tasks, {
+      concurrent: !verbose,
+    }),
+
+    skip: () => isFalsy(models) && 'No models have been configured',
+
+  };
+};
 
 /**
- * Apply patches to their target services.
- * @param {string}          title task title
- * @param {string}            cwd path to working directory
- * @param {Patch[]}       patches list of patches
- * @param {boolean}       verbose global _verbose_ option
- * @param {() => boolean} enabled enabler function
+ * Restores services repositories to their original state.
+ * @param {string}    title task title
+ * @param {boolean} verbose global _verbose_option
  */
-const applyPatches = (title, cwd, patches, verbose, enabled) => ({
+const resetServices = async (title, verbose) => {
 
-  title,
+  const { cwd, services } = getConfig();
 
-  task: () => new Listr(
-    patches.map(p => ({
-      title: p.src,
-      task: () => applyPatch(cwd, p, verbose),
-    }))
-  ),
+  return {
 
-  enabled,
-});
+    title,
+
+    task: () => new Listr(
+      services.map(serviceJson => {
+
+        return {
+
+          title: serviceJson.name,
+
+          task: (ctx, task) => new Observable(async observer => {
+
+            const { template, ...service } = await parseService(serviceJson);
+
+            try {
+              observer.next('Resetting repository to its current HEAD');
+              await resetRepository(cwd, service.path, null, verbose);
+
+              observer.next('Removing untracked files');
+              await cleanRepository(cwd, service.path, verbose);
+
+            }
+            catch (error) {
+              if (error.code === 'ENOENT')
+                task.skip('Service is not installed');
+              observer.error(error);
+            }
+
+            if (template.source) {
+              observer.next('Applying staged source changes');
+              await cloneStaged(cwd, template.path, service.path, verbose);
+            }
+
+            observer.complete();
+
+          })
+
+        };
+      }),
+      {
+        concurrent: !verbose,
+      }
+    ),
+
+    skip: async () => {
+      const exists = await checkWorkspace(cwd);
+      return !exists.services && 'No services are installed';
+    }
+  };
+
+};
 
 
 /* COMMAND */
@@ -111,6 +217,7 @@ exports.builder  = {
     describe: 'Clean generated code and patches',
     group: 'Codegen',
     type: 'boolean',
+    conflicts: [ 'code', 'patch' ]
   },
   code: {
     describe: 'Generate code only',
@@ -126,7 +233,7 @@ exports.builder  = {
 
 exports.codegenTasks = {
   applyPatches,
-  generateServices,
+  generateServicesCode,
   resetServices,
 };
 
@@ -141,34 +248,31 @@ exports.codegenTasks = {
  *
  * @param {CodegenOpts} opts codegen command options
  */
-exports.handler = (opts) => {
+exports.handler = async (opts) => {
 
-  const { cwd, services, models, patches, templates } = getConfig();
   const { clean, code, patch, verbose } = opts;
 
   const defaultRun = !clean && !code && !patch;
 
-  const tasks = new Listr([
-    resetServices(
-      'Reset service repositories',
-      cwd, services, verbose,
-      () => clean || code || defaultRun
-    ),
-    generateServices(
-      'Generate code',
-      cwd, models, services, templates, verbose,
-      () => code || defaultRun
-    ),
-    applyPatches(
-      'Apply patches',
-      cwd, patches, verbose,
-      () => patch || defaultRun
-    )
-  ], {
+  const tasks = new Listr({
     renderer: verbose ? VerboseRenderer : UpdaterRenderer,
     collapse: false,
   });
 
-  tasks.run().catch(err => { /* console.error */ });
+  // --clean
+  if (clean || code || defaultRun) tasks.add( await resetServices('Reset services', verbose) );
+
+  // --code
+  if (code || defaultRun) tasks.add( await generateServicesCode('Generate code', verbose) );
+
+  // // --patch
+  if (patch || defaultRun) tasks.add( applyPatches('Apply patches', verbose) );
+
+
+  tasks.run().catch(error => {
+    if (verbose)
+      console.error(error.message);
+    process.exit(error.errno);
+  });
 
 };
