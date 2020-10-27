@@ -2,7 +2,6 @@ const { command }        = require('execa');
 const { statSync }       = require('fs');
 const { parse, resolve } = require('path');
 const { exit }           = require('process');
-const { expandPath }     = require('../config/helpers');
 
 
 /**
@@ -16,7 +15,7 @@ exports.runTest = async function (cwd, test, verbose) {
   const { target, options, runner } = test;
 
   // Expand target path if needed
-  const targetPath = resolve(cwd, expandPath(target));
+  const targetPath = resolve(cwd, target);
 
   // Determine runner working directory
   const { dir: testFileCwd, base: testFile } = parse(targetPath);
