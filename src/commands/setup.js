@@ -379,10 +379,10 @@ exports.handler = async (opts) => {
     setupServices('Setup services', verbose)
   );
 
-  // // --modules
-  // if (modules || services || defaultRun) tasks.add(
-  //   setupModules( 'Install node modules', verbose)
-  // );
+  // --modules
+  if (modules || services || defaultRun) tasks.add(
+    setupModules( 'Install node modules', verbose)
+  );
 
   tasks.run().catch(error => {
     console.error(error.message);
