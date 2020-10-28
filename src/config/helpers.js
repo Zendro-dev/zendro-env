@@ -3,6 +3,9 @@ const { join, sep, parse, resolve } = require('path');
 const { getConfig }                 = require('./config');
 const { pathExists, isRemote }      = require('../utils/path-guards');
 
+const DOTZENV = '.zenv';
+const CACHE   = join(DOTZENV, 'cache');
+const MODULES = 'node_modules';
 
 /**
  * Check whether expected workspace folders exist.
@@ -11,7 +14,7 @@ const { pathExists, isRemote }      = require('../utils/path-guards');
  */
 exports.checkWorkspace = async function () {
 
-  const { cwd } = getConfig();
+  const { cwd, services } = getConfig();
 
   let exists = {};
 
@@ -19,9 +22,16 @@ exports.checkWorkspace = async function () {
 
   if (exists.workspace) {
 
-    exists.cache    = await pathExists(join(cwd, 'cache'));
-    exists.modules  = await pathExists(join(cwd, 'node_modules'));
-    exists.services = await pathExists(join(cwd, 'services'));
+    exists.zenv     = await pathExists(join(cwd, DOTZENV));
+    exists.cache    = await pathExists(join(cwd, CACHE));
+    exists.modules  = await pathExists(join(cwd, MODULES));
+
+    // Check that `any` module exists
+    for (const serviceJson of services) {
+      exists.services = await pathExists(join(cwd, serviceJson.name));
+      if (exists.services)
+        break;
+    }
 
   }
 
@@ -74,8 +84,26 @@ exports.servicePath = function (path) {
 
   // Replace segment in the original path with the expanded path
   return service
-    ? path.replace(name, join('services', service.name))
+    ? service.name
     : null;
+};
+
+/**
+ * Resolve model properties to their actual object values.
+ * @param {Model} model configured model object
+ */
+exports.parseModel = async function (model) {
+
+  const codegen = await exports.parseTemplate(model.codegen);
+  const options = model.options
+    ? exports.composeOptionsString(model.options)
+    : '';
+
+  return {
+    ...model,
+    codegen,
+    options,
+  };
 };
 
 /**
@@ -84,12 +112,11 @@ exports.servicePath = function (path) {
  */
 exports.parseService = async function (service) {
 
-  const path = exports.servicePath(service.name);
   const template = await exports.parseTemplate(service.template);
 
   return {
     ...service,
-    path,
+    path: service.name,
     template,
   };
 
@@ -120,7 +147,9 @@ exports.parseTemplate = async function (repository) {
    * - A source template will always resolve to the user-defined path.
    * - A remote template will be stored in the "cache" folder within the `cwd`
    */
-  const path = source ? repository : join('cache', parse(repository).name);
+  const path = source
+    ? repository
+    : join(CACHE, parse(repository).name);
 
   /**
    * Determine whether the repository is already installed in the cache.

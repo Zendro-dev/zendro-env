@@ -3,26 +3,37 @@ const VerboseRenderer = require('listr-verbose-renderer');
 const UpdaterRenderer = require('listr-update-renderer');
 const { Observable }  = require('rxjs');
 
-const { getConfig } = require('../config/config');
+const {
+  getConfig
+} = require('../config/config');
+
 const {
   checkWorkspace,
   composeOptionsString,
+  parseModel,
   parseService,
-  parseTemplate,
   servicePath,
 } = require('../config/helpers');
 
 const {
+  checkoutBranch,
   cleanRepository,
   cloneStaged,
   resetRepository,
 } = require('../handlers/git');
+
 const {
   applyPatch,
   generateCode,
 } = require('../handlers/codegen');
 
-const { isFalsy } = require('../utils/type-guards');
+const {
+  renamePackageJson
+} = require('../handlers/setup');
+
+const {
+  isFalsy
+} = require('../utils/type-guards');
 
 
 /* TASKS */
@@ -34,7 +45,7 @@ const { isFalsy } = require('../utils/type-guards');
  */
 const applyPatches = (title, verbose) => {
 
-  const { cwd, patches } = getConfig();
+  const { cwd, services, patches } = getConfig();
 
   return {
 
@@ -52,7 +63,7 @@ const applyPatches = (title, verbose) => {
 
           try {
             const options = patch.options ? composeOptionsString(patch.options) : '';
-            applyPatch(cwd, patch.path, target, options, verbose);
+            applyPatch(cwd, patch.path, patch.target, options, verbose);
           }
           catch (error) {
             observer.error(error);
@@ -82,11 +93,9 @@ const generateServicesCode = async (title, verbose) => {
 
   for (const modelJson of models) {
 
-    const options = modelJson.options
-      ? composeOptionsString(modelJson.options)
-      : '';
+    const { codegen, ...model } = await parseModel(modelJson);
 
-    for (const serviceName of modelJson.targets) {
+    for (const serviceName of model.targets) {
 
       tasks.push({
         title: serviceName,
@@ -101,7 +110,6 @@ const generateServicesCode = async (title, verbose) => {
               observer.complete();
             }
 
-            const codegen = await parseTemplate(modelJson.codegen);
             if (!codegen.installed) {
               observer.error(new Error(`codegen ${codegen.path} is not installed`));
               observer.complete();
@@ -109,9 +117,11 @@ const generateServicesCode = async (title, verbose) => {
 
             else {
               const service = await parseService(serviceJson);
+              observer.next(`Checking out branch "${model.branch}"`);
+              await checkoutBranch(cwd, codegen.path, model.branch, verbose);
               observer.next(`Generating code for ${service.name}`);
               await generateCode(
-                cwd, codegen.main, modelJson.path, service.path, options, verbose
+                cwd, codegen.main, model.path, service.path, model.options, verbose
               );
             }
 
@@ -135,7 +145,7 @@ const generateServicesCode = async (title, verbose) => {
     title,
 
     task: () => new Listr(tasks, {
-      concurrent: !verbose,
+      // concurrent: !verbose,
     }),
 
     skip: () => isFalsy(models) && 'No models have been configured',
@@ -148,7 +158,7 @@ const generateServicesCode = async (title, verbose) => {
  * @param {string}    title task title
  * @param {boolean} verbose global _verbose_option
  */
-const resetServices = async (title, verbose) => {
+const resetServices = (title, verbose) => {
 
   const { cwd, services } = getConfig();
 
@@ -185,6 +195,8 @@ const resetServices = async (title, verbose) => {
               observer.next('Applying staged source changes');
               await cloneStaged(cwd, template.path, service.path, verbose);
             }
+
+            await renamePackageJson(cwd, service.path);
 
             observer.complete();
 
@@ -260,7 +272,7 @@ exports.handler = async (opts) => {
   });
 
   // --clean
-  if (clean || code || defaultRun) tasks.add( await resetServices('Reset services', verbose) );
+  if (clean || code || defaultRun) tasks.add( resetServices('Reset services', verbose) );
 
   // --code
   if (code || defaultRun) tasks.add( await generateServicesCode('Generate code', verbose) );

@@ -29,6 +29,7 @@
 
 /**
  * @typedef  {Object}     Model Configured model definitions
+ * @property {string}    branch code generator branch
  * @property {string}   codegen code generator repository for these models
  * @property {string[]} options options array for the code-generator
  * @property {string}      path relative location of the model definitions
