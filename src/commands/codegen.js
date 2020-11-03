@@ -13,6 +13,7 @@ const {
 } = require('../config/helpers');
 
 const {
+  checkoutBranch,
   cleanRepository,
   cloneStaged,
   resetRepository,
@@ -109,6 +110,8 @@ const generateServicesCode = async (title, verbose) => {
 
             else {
               const service = await parseService(serviceJson);
+              observer.next(`Checking out branch "${modelJson.branch}"`);
+              await checkoutBranch(cwd, codegen.path, modelJson.branch, verbose);
               observer.next(`Generating code for ${service.name}`);
               await generateCode(
                 cwd, codegen.main, modelJson.path, service.path, options, verbose
@@ -135,7 +138,7 @@ const generateServicesCode = async (title, verbose) => {
     title,
 
     task: () => new Listr(tasks, {
-      concurrent: !verbose,
+      // concurrent: !verbose,
     }),
 
     skip: () => isFalsy(models) && 'No models have been configured',
