@@ -110,8 +110,10 @@ const generateServicesCode = async (title, verbose) => {
 
             else {
               const service = await parseService(serviceJson);
-              observer.next(`Checking out branch "${modelJson.branch}"`);
-              await checkoutBranch(cwd, codegen.path, modelJson.branch, verbose);
+              if (modelJson.branch) {
+                observer.next(`Checking out branch "${modelJson.branch}"`);
+                await checkoutBranch(cwd, codegen.path, modelJson.branch, verbose);
+              }
               observer.next(`Generating code for ${service.name}`);
               await generateCode(
                 cwd, codegen.main, modelJson.path, service.path, options, verbose
@@ -121,6 +123,14 @@ const generateServicesCode = async (title, verbose) => {
             observer.complete();
           }
           catch (error) {
+            if (error.message.includes('MODULE_NOT_FOUND')) {
+              const shortMessage = error.message.match(/Error:.*/);
+              observer.error(
+                new Error(
+                  `${shortMessage} -- Please verify that node modules are installed`
+                )
+              );
+            }
             observer.error(error);
           }
           observer.complete();
